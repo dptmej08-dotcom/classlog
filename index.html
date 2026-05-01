@@ -99,6 +99,7 @@
     .ai-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
     .ai-dot.loading { animation: pulse 1s infinite; background: var(--warn); }
     @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+    @keyframes ringPulse { 0%{transform:scale(1);opacity:0.8} 100%{transform:scale(1.3);opacity:0} }
     .ai-label { font-size: 12px; font-weight: 700; }
     .ai-label.loading { color: var(--warn); }
     .ai-label.done { color: var(--success); }
@@ -274,83 +275,349 @@ async function init() {
   }
 }
 
-/* ===================== 회원 전용 앱 ===================== */
+/* ===================== 회원 전용 RPG 앱 ===================== */
+
+const GAME_MISSIONS = [
+  { id:'attend',  text:'오늘 수업 출석',     sub:'트레이너와 함께!',       xp:50, icon:'🏋️', stage:0 },
+  { id:'cardio',  text:'유산소 20분',         sub:'걷기·달리기·자전거',     xp:30, icon:'🏃', stage:1 },
+  { id:'water',   text:'수분 2L 마시기',      sub:'건강의 기본!',           xp:20, icon:'💧', stage:2 },
+  { id:'stretch', text:'스트레칭 10분',       sub:'마무리 필수',            xp:20, icon:'🧘', stage:3 },
+  { id:'inbody',  text:'인바디 체크',         sub:'체지방·근육량 확인',     xp:40, icon:'📊', stage:4 },
+  { id:'fat',     text:'체지방 감소 확인',    sub:'지난 달 대비 감소!',     xp:60, icon:'🔥', stage:5 },
+  { id:'muscle',  text:'근력 증가 확인',      sub:'한 달간 성장했어요!',    xp:60, icon:'💪', stage:6 },
+];
+
+const CHAR_BODIES  = ['🧑','👦','👧','🧔','👩','🧒'];
+const CHAR_COLORS  = ['#7c3aed','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899'];
+const CHAR_TITLES  = ['헬스 루키','운동 전사','피트니스 챔피언','철의 의지','전설의 몸짱'];
+
+let gMember = null, gXP = 0, gLevel = 1, gChar = { body:0, color:0 };
+let gMissions = GAME_MISSIONS.map(m => ({...m, done:false}));
+let gFriends = [], gActiveTab = 'map';
+
 function renderMemberOnlyApp(member) {
+  gMember = member;
+  gChar = member.character && Object.keys(member.character).length ? member.character : { body:0, color:0 };
+
   const app = document.getElementById('app');
+  app.style.cssText = 'background:#f0f4ff';
   app.innerHTML = `
-    <div class="member-only-header">
-      <div class="member-only-title">FitLog</div>
-      <div class="member-only-name">${member.name}님의 기록</div>
-    </div>
-    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 30px;display:flex;flex-direction:column;gap:12px;" id="member-content">
-      <div class="empty">불러오는 중...</div>
-    </div>`;
-  loadMemberContent(member);
-}
-
-async function loadMemberContent(member) {
-  const el = document.getElementById('member-content');
-
-  const { count } = await sb.from('workout_records')
-    .select('*', { count: 'exact', head: true }).eq('member_id', member.id);
-  const total = count || 0;
-  const xp = total * 100;
-  const level = Math.floor(xp / 1000) + 1;
-  const xpIn = xp % 1000;
-
-  const { data: rec } = await sb.from('workout_records')
-    .select('*, exercises(*)').eq('member_id', member.id)
-    .order('recorded_at', { ascending: false }).limit(1).maybeSingle();
-
-  const missionDone = missions.filter(m => m.done).length;
-
-  el.innerHTML = `
-    <div class="member-header">
-      <div class="avatar">${member.name.slice(0,2)}</div>
-      <div style="flex:1">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-          <div style="font-size:17px;font-weight:900">${member.name}님</div>
-          <div class="level-badge">Lv.${level}</div>
+    <div style="background:linear-gradient(135deg,#7c3aed,#06b6d4);padding:calc(14px + env(safe-area-inset-top)) 18px 14px;flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.75);letter-spacing:1px">FITLOG</div>
+          <div style="font-size:18px;font-weight:900;color:#fff" id="g-name">${member.name}님</div>
         </div>
-        <div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${xpIn/10}%"></div></div>
-        <div class="xp-text">${xpIn} / 1000 XP</div>
+        <div style="text-align:right">
+          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.75)" id="g-level-label">Lv.1 헬스 루키</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+            <div style="flex:1;height:6px;background:rgba(255,255,255,0.25);border-radius:10px;width:100px;overflow:hidden">
+              <div id="g-xp-bar" style="height:100%;background:#fff;border-radius:10px;transition:width 1s;width:0%"></div>
+            </div>
+            <div style="font-size:11px;color:#fff;font-weight:700" id="g-xp-text">0 XP</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="stat-row">
-      <div class="stat-card"><div class="stat-num" style="color:#f59e0b">${Math.min(total,7)}</div><div class="stat-label">🔥 연속 출석</div></div>
-      <div class="stat-card"><div class="stat-num" style="color:#7c3aed">${total}</div><div class="stat-label">💪 총 수업</div></div>
-      <div class="stat-card"><div class="stat-num" style="color:#10b981" id="solo-mission-count">${missionDone}</div><div class="stat-label">✅ 오늘 미션</div></div>
+    <div style="flex:1;overflow:hidden;position:relative">
+      <div id="gtab-map"   style="display:flex;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:14px 14px calc(80px + env(safe-area-inset-bottom))"></div>
+      <div id="gtab-char"  style="display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:14px 14px calc(80px + env(safe-area-inset-bottom));gap:12px"></div>
+      <div id="gtab-rec"   style="display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:14px 14px calc(80px + env(safe-area-inset-bottom));gap:12px"></div>
+      <div id="gtab-rank"  style="display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:14px 14px calc(80px + env(safe-area-inset-bottom));gap:12px"></div>
     </div>
 
-    <div class="card">
-      <div class="card-title">🎮 오늘의 미션</div>
-      <div class="missions-grid" id="solo-missions"></div>
+    <div style="flex-shrink:0;display:flex;background:#fff;border-top:1px solid #e5e7eb;padding:6px 0 calc(6px + env(safe-area-inset-bottom))">
+      <button class="gnav" id="gnav-map"  onclick="gShowTab('map')"  style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#9ca3af;font-size:10px;font-weight:700;cursor:pointer;padding:4px 0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>모험 맵
+      </button>
+      <button class="gnav" id="gnav-char" onclick="gShowTab('char')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#9ca3af;font-size:10px;font-weight:700;cursor:pointer;padding:4px 0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>캐릭터
+      </button>
+      <button class="gnav" id="gnav-rec"  onclick="gShowTab('rec')"  style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#9ca3af;font-size:10px;font-weight:700;cursor:pointer;padding:4px 0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>수업기록
+      </button>
+      <button class="gnav" id="gnav-rank" onclick="gShowTab('rank')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#9ca3af;font-size:10px;font-weight:700;cursor:pointer;padding:4px 0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 20 18 10"/><polyline points="12 20 12 4"/><polyline points="6 20 6 14"/></svg>랭킹
+      </button>
+    </div>`;
+
+  loadGameData(member);
+}
+
+async function loadGameData(member) {
+  const [{ count }, { data: rec }, { data: friendData }] = await Promise.all([
+    sb.from('workout_records').select('*',{count:'exact',head:true}).eq('member_id', member.id),
+    sb.from('workout_records').select('*,exercises(*)').eq('member_id', member.id).order('recorded_at',{ascending:false}).limit(5),
+    sb.from('friendships').select('friend_id, members!friendships_friend_id_fkey(id,name,xp,character)').eq('member_id', member.id)
+  ]);
+
+  gXP = member.xp || (count || 0) * 100;
+  gLevel = Math.floor(gXP / 100) + 1;
+  gFriends = (friendData || []).map(f => f.members).filter(Boolean);
+
+  updateHeader();
+  renderGameMap();
+  renderCharTab();
+  renderRecTab(rec || []);
+  renderRankTab();
+  gShowTab('map');
+}
+
+function updateHeader() {
+  const xpInLevel = gXP % 100;
+  const title = CHAR_TITLES[Math.min(Math.floor(gXP / 100 / 5), CHAR_TITLES.length - 1)];
+  document.getElementById('g-level-label').textContent = `Lv.${gLevel} ${title}`;
+  document.getElementById('g-xp-bar').style.width = xpInLevel + '%';
+  document.getElementById('g-xp-text').textContent = `${xpInLevel}/100 XP`;
+}
+
+/* ── 모험 맵 ── */
+function renderGameMap() {
+  const el = document.getElementById('gtab-map');
+  const totalDone = gMissions.filter(m => m.done).length;
+  const todayXP = gMissions.filter(m => m.done).reduce((s,m) => s+m.xp, 0);
+
+  let html = `
+    <div style="background:#fff;border-radius:16px;padding:14px 16px;border:1px solid #e5e7eb;margin-bottom:4px;display:flex;align-items:center;gap:12px">
+      <div style="font-size:32px">${CHAR_BODIES[gChar.body]}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:800;color:#1e1b4b">오늘의 모험</div>
+        <div style="font-size:12px;color:#6b7280;margin-top:2px">${totalDone}/${gMissions.length} 스테이지 완료 · +${todayXP} XP 획득</div>
+        <div style="height:5px;background:#f3f4f6;border-radius:10px;margin-top:6px;overflow:hidden">
+          <div style="height:100%;background:linear-gradient(90deg,#7c3aed,#06b6d4);border-radius:10px;width:${Math.round(totalDone/gMissions.length*100)}%;transition:width 0.6s"></div>
+        </div>
+      </div>
     </div>
+    <div style="position:relative;padding:10px 0">`;
 
-    ${rec ? `
-    <div class="card">
-      <div class="card-title">📋 최근 수업 기록</div>
-      <div id="solo-record"></div>
-    </div>` : ''}`;
+  gMissions.forEach((m, i) => {
+    const done = m.done;
+    const isNext = !done && (i === 0 || gMissions[i-1].done);
+    const locked = !done && !isNext;
+    const isLast = i === gMissions.length - 1;
 
-  renderMissionsInto('solo-missions', 'solo-mission-count');
+    const stageColor = done ? '#10b981' : isNext ? '#7c3aed' : '#d1d5db';
+    const stageBg    = done ? '#d1fae5' : isNext ? '#ede9fe' : '#f9fafb';
+    const textColor  = done ? '#065f46' : isNext ? '#4c1d95' : '#9ca3af';
 
-  if (rec) {
-    const nums = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
-    const exs = (rec.exercises || []).sort((a,b) => a.order_num - b.order_num);
-    document.getElementById('solo-record').innerHTML =
-      exs.map((e,i) => {
-        const v = [e.weight?e.weight+'kg':'', e.reps?e.reps+'회':'', e.sets?e.sets+'세트':''].filter(Boolean).join(' × ');
-        return `<div class="record-row" style="flex-direction:column;align-items:flex-start;gap:2px">
-          <div style="display:flex;justify-content:space-between;width:100%">
-            <span class="record-name">${nums[i]||i+1} ${e.name}</span>
-            <span class="record-val">${v}</span>
+    // path connector (except last)
+    const connectorHtml = !isLast ? `
+      <div style="display:flex;justify-content:center;padding:2px 0">
+        <div style="width:3px;height:28px;background:${done ? '#10b981' : '#e5e7eb'};border-radius:2px"></div>
+      </div>` : '';
+
+    html += `
+      <div style="display:flex;align-items:center;gap:12px;padding:0 8px">
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div onclick="${locked ? '' : `gToggleMission(${i})`}"
+            style="width:52px;height:52px;border-radius:50%;background:${stageBg};border:3px solid ${stageColor};display:flex;align-items:center;justify-content:center;font-size:22px;cursor:${locked?'default':'pointer'};position:relative;transition:all 0.2s;flex-shrink:0">
+            ${done ? '✅' : locked ? '🔒' : m.icon}
+            ${isNext ? `<div style="position:absolute;inset:-4px;border-radius:50%;border:2px solid #7c3aed;animation:ringPulse 1.5s infinite"></div>` : ''}
           </div>
-          ${e.memo ? `<div class="record-ex-memo">💬 ${e.memo}</div>` : ''}
-        </div>`;
-      }).join('') + (rec.note ? `<div class="record-note">${rec.note}</div>` : '');
+        </div>
+        <div onclick="${locked ? '' : `gToggleMission(${i})`}"
+          style="flex:1;background:${stageBg};border:2px solid ${stageColor};border-radius:14px;padding:12px 14px;cursor:${locked?'default':'pointer'};transition:all 0.2s">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:13px;font-weight:800;color:${textColor}">${m.text}</div>
+            <div style="font-size:11px;font-weight:800;color:${done?'#10b981':isNext?'#7c3aed':'#9ca3af'};background:${done?'#d1fae5':isNext?'#ede9fe':'#f3f4f6'};padding:3px 8px;border-radius:10px">+${m.xp} XP</div>
+          </div>
+          <div style="font-size:11px;color:${locked?'#9ca3af':'#6b7280'};margin-top:3px">${locked ? '🔒 이전 스테이지를 먼저 클리어하세요' : m.sub}</div>
+        </div>
+      </div>
+      ${connectorHtml}`;
+  });
+
+  html += `</div>`;
+
+  // 100 XP 달성 배너
+  if (todayXP >= 100) {
+    html += `<div style="background:linear-gradient(135deg,#f59e0b,#ef4444);border-radius:16px;padding:16px;text-align:center;color:#fff;margin-top:4px">
+      <div style="font-size:24px">🎉</div>
+      <div style="font-size:15px;font-weight:900;margin-top:4px">레벨업 달성!</div>
+      <div style="font-size:12px;opacity:0.85;margin-top:2px">오늘 목표를 모두 완료했어요</div>
+    </div>`;
   }
+
+  el.innerHTML = html;
+}
+
+async function gToggleMission(i) {
+  gMissions[i].done = !gMissions[i].done;
+  const gained = gMissions[i].done ? gMissions[i].xp : -gMissions[i].xp;
+  gXP = Math.max(0, gXP + gained);
+  gLevel = Math.floor(gXP / 100) + 1;
+
+  // XP 팝업
+  if (gMissions[i].done) {
+    showGameToast(`${gMissions[i].icon} +${gMissions[i].xp} XP!`);
+    if (gXP % 100 < gMissions[i].xp) showGameToast('🎊 레벨 UP!');
+  }
+
+  await sb.from('members').update({ xp: gXP }).eq('id', gMember.id);
+  updateHeader();
+  renderGameMap();
+}
+
+/* ── 캐릭터 탭 ── */
+function renderCharTab() {
+  const el = document.getElementById('gtab-char');
+  el.innerHTML = `
+    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:20px;text-align:center">
+      <div style="font-size:72px;line-height:1;margin-bottom:8px" id="char-preview">${CHAR_BODIES[gChar.body]}</div>
+      <div style="font-size:16px;font-weight:900;color:#1e1b4b">${gMember.name}</div>
+      <div style="font-size:12px;font-weight:700;color:#7c3aed;margin-top:4px">Lv.${gLevel} · ${CHAR_TITLES[Math.min(Math.floor(gXP/500), CHAR_TITLES.length-1)]}</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;border-radius:20px;padding:4px 14px;margin-top:8px">
+        <span style="font-size:13px">⭐</span>
+        <span style="font-size:13px;font-weight:800;color:#92400e">${gXP} XP 누적</span>
+      </div>
+    </div>
+
+    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:16px">
+      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:12px">캐릭터 선택</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px">
+        ${CHAR_BODIES.map((b,i) => `
+          <div onclick="gSelectBody(${i})" style="font-size:28px;text-align:center;padding:8px;border-radius:12px;border:2px solid ${gChar.body===i?'#7c3aed':'#e5e7eb'};background:${gChar.body===i?'#ede9fe':'#f9fafb'};cursor:pointer">${b}</div>
+        `).join('')}
+      </div>
+      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:10px">컬러 선택</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${CHAR_COLORS.map((c,i) => `
+          <div onclick="gSelectColor(${i})" style="width:36px;height:36px;border-radius:50%;background:${c};border:3px solid ${gChar.color===i?'#1e1b4b':'transparent'};cursor:pointer;transition:all 0.2s"></div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:16px">
+      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:12px">내 배지</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${gXP>=50?'<div style="background:#ede9fe;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;color:#7c3aed">🏅 첫 출석</div>':''}
+        ${gXP>=100?'<div style="background:#d1fae5;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;color:#065f46">⭐ 100 XP 달성</div>':''}
+        ${gXP>=500?'<div style="background:#fef3c7;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;color:#92400e">🔥 500 XP 달성</div>':''}
+        ${gXP<50?'<div style="color:#9ca3af;font-size:13px">미션을 완료하면 배지를 획득해요!</div>':''}
+      </div>
+    </div>`;
+}
+
+async function gSelectBody(i) {
+  gChar.body = i;
+  document.getElementById('char-preview').textContent = CHAR_BODIES[i];
+  await sb.from('members').update({ character: gChar }).eq('id', gMember.id);
+  renderCharTab();
+}
+
+async function gSelectColor(i) {
+  gChar.color = i;
+  await sb.from('members').update({ character: gChar }).eq('id', gMember.id);
+  renderCharTab();
+}
+
+/* ── 수업 기록 탭 ── */
+function renderRecTab(records) {
+  const el = document.getElementById('gtab-rec');
+  if (!records.length) { el.innerHTML = '<div class="empty">아직 수업 기록이 없어요</div>'; return; }
+  const nums = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
+  el.innerHTML = records.map(r => {
+    const exs = (r.exercises||[]).sort((a,b)=>a.order_num-b.order_num);
+    const date = new Date(r.recorded_at).toLocaleDateString('ko-KR',{month:'long',day:'numeric'});
+    return `<div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:14px 16px">
+      <div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:10px">${date}</div>
+      ${exs.map((e,i)=>{
+        const v=[e.weight?e.weight+'kg':'',e.reps?e.reps+'회':'',e.sets?e.sets+'세트':''].filter(Boolean).join(' × ');
+        return `<div style="display:flex;flex-direction:column;padding:7px 0;border-bottom:1px solid #f3f4f6">
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:13px;font-weight:700">${nums[i]||i+1} ${e.name}</span>
+            <span style="font-size:12px;color:#6b7280">${v}</span>
+          </div>
+          ${e.memo?`<div style="font-size:11px;color:#92400e;background:#fef3c7;border-radius:6px;padding:3px 8px;margin-top:4px">💬 ${e.memo}</div>`:''}
+        </div>`;
+      }).join('')}
+      ${r.note?`<div style="font-size:11px;color:#92400e;background:#fef3c7;border-radius:8px;padding:7px 10px;margin-top:8px">${r.note}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+/* ── 랭킹 탭 ── */
+async function renderRankTab() {
+  const el = document.getElementById('gtab-rank');
+
+  const { data: allMembers } = await sb.from('members').select('id,name,xp,character').order('xp',{ascending:false}).limit(20);
+  const meIdx = (allMembers||[]).findIndex(m => m.id === gMember.id);
+
+  let html = `
+    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:14px 16px">
+      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:12px">🏆 전체 랭킹</div>
+      ${(allMembers||[]).map((m, i) => {
+        const isMe = m.id === gMember.id;
+        const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
+        const char = m.character && m.character.body !== undefined ? CHAR_BODIES[m.character.body] : '🧑';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f3f4f6;${isMe?'background:#f5f3ff;border-radius:10px;padding:9px 10px;margin:2px -4px':''}">
+          <div style="font-size:${i<3?'20px':'13px'};font-weight:800;min-width:24px;text-align:center">${medal}</div>
+          <div style="font-size:22px">${char}</div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:${isMe?900:700};color:${isMe?'#7c3aed':'#1e1b4b'}">${m.name}${isMe?' (나)':''}</div>
+            <div style="font-size:11px;color:#9ca3af">Lv.${Math.floor((m.xp||0)/100)+1} · ${m.xp||0} XP</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:14px 16px">
+      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:6px">👥 친구 추가</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:10px;line-height:1.6">다른 회원의 링크에서 ID를 복사해서 입력하세요</div>
+      <div style="display:flex;gap:8px">
+        <input id="friend-id-input" placeholder="친구 ID 붙여넣기" style="flex:1;background:#f5f3ff;border:1.5px solid #e5e7eb;border-radius:10px;color:#1e1b4b;font-size:13px;padding:9px 12px;outline:none">
+        <button onclick="addFriend()" style="padding:9px 16px;background:#7c3aed;border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">추가</button>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#9ca3af">내 ID: <span onclick="copyMyId()" style="color:#7c3aed;font-weight:700;cursor:pointer">${gMember.id.slice(0,8)}... (탭하여 복사)</span></div>
+    </div>`;
+
+  el.innerHTML = html;
+}
+
+async function addFriend() {
+  const input = document.getElementById('friend-id-input');
+  const rawId = input.value.trim();
+  if (!rawId) { showGameToast('ID를 입력해주세요'); return; }
+
+  const { data: found } = await sb.from('members').select('id,name').ilike('id', rawId + '%').limit(1).maybeSingle();
+  if (!found) { showGameToast('회원을 찾을 수 없어요'); return; }
+  if (found.id === gMember.id) { showGameToast('나 자신은 추가할 수 없어요'); return; }
+
+  await sb.from('friendships').upsert({ member_id: gMember.id, friend_id: found.id });
+  input.value = '';
+  showGameToast(found.name + '님과 친구가 됐어요! 👥');
+  renderRankTab();
+}
+
+function copyMyId() {
+  navigator.clipboard.writeText(gMember.id);
+  showGameToast('내 ID 복사됨!');
+}
+
+/* ── 탭 전환 ── */
+function gShowTab(tab) {
+  gActiveTab = tab;
+  ['map','char','rec','rank'].forEach(t => {
+    const el = document.getElementById('gtab-'+t);
+    if (el) el.style.display = t === tab ? 'flex' : 'none';
+    const nav = document.getElementById('gnav-'+t);
+    if (nav) nav.style.color = t === tab ? '#7c3aed' : '#9ca3af';
+  });
+  if (tab === 'rank') renderRankTab();
+}
+
+function showGameToast(msg) {
+  let t = document.getElementById('game-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'game-toast';
+    t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#7c3aed;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:999;white-space:nowrap';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  setTimeout(() => t.style.opacity = '0', 2000);
 }
 
 /* ===================== 트레이너 앱 ===================== */
