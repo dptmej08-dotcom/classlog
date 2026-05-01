@@ -100,6 +100,9 @@
     .ai-dot.loading { animation: pulse 1s infinite; background: var(--warn); }
     @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
     @keyframes ringPulse { 0%{transform:scale(1);opacity:0.8} 100%{transform:scale(1.3);opacity:0} }
+    @keyframes pixelPulse { 0%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.06)} 100%{opacity:1;transform:scale(1)} }
+    @keyframes pixelBounce { 0%{transform:translateY(0)} 100%{transform:translateY(-4px)} }
+    @keyframes pixelBlink { 0%,100%{opacity:1} 49%{opacity:1} 50%{opacity:0} }
     .ai-label { font-size: 12px; font-weight: 700; }
     .ai-label.loading { color: var(--warn); }
     .ai-label.done { color: var(--success); }
@@ -277,68 +280,105 @@ async function init() {
 
 /* ===================== 회원 전용 RPG 앱 ===================== */
 
-const GAME_MISSIONS = [
-  { id:'attend',  text:'오늘 수업 출석',     sub:'트레이너와 함께!',       xp:50, icon:'🏋️', stage:0 },
-  { id:'cardio',  text:'유산소 20분',         sub:'걷기·달리기·자전거',     xp:30, icon:'🏃', stage:1 },
-  { id:'water',   text:'수분 2L 마시기',      sub:'건강의 기본!',           xp:20, icon:'💧', stage:2 },
-  { id:'stretch', text:'스트레칭 10분',       sub:'마무리 필수',            xp:20, icon:'🧘', stage:3 },
-  { id:'inbody',  text:'인바디 체크',         sub:'체지방·근육량 확인',     xp:40, icon:'📊', stage:4 },
-  { id:'fat',     text:'체지방 감소 확인',    sub:'지난 달 대비 감소!',     xp:60, icon:'🔥', stage:5 },
-  { id:'muscle',  text:'근력 증가 확인',      sub:'한 달간 성장했어요!',    xp:60, icon:'💪', stage:6 },
+const DAILY_MISSIONS = [
+  { id:'attend',  text:'출석 완료',      sub:'트레이너와 함께!',    xp:50, terrain:'castle' },
+  { id:'cardio',  text:'유산소 20분',    sub:'걷기·달리기·자전거', xp:30, terrain:'forest' },
+  { id:'water',   text:'수분 2L',        sub:'건강의 기본!',        xp:20, terrain:'river'  },
+  { id:'stretch', text:'스트레칭 10분',  sub:'마무리 필수',         xp:20, terrain:'mountain'},
+];
+const MONTHLY_MISSIONS = [
+  { id:'fat',     text:'체지방 감소 확인',  sub:'지난 달 대비!',       xp:60, terrain:'boss' },
+  { id:'muscle',  text:'근력 증가 확인',   sub:'한 달간 성장!',       xp:60, terrain:'boss' },
 ];
 
-const CHAR_BODIES  = ['🧑','👦','👧','🧔','👩','🧒'];
-const CHAR_COLORS  = ['#7c3aed','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899'];
-const CHAR_TITLES  = ['헬스 루키','운동 전사','피트니스 챔피언','철의 의지','전설의 몸짱'];
+// 8bit 픽셀 아트 (SVG)
+const PIXEL_TERRAINS = {
+  castle: `<svg viewBox="0 0 24 24" width="28" height="28"><rect x="2" y="14" width="20" height="8" fill="#a78bfa"/><rect x="0" y="10" width="6" height="8" fill="#7c3aed"/><rect x="18" y="10" width="6" height="8" fill="#7c3aed"/><rect x="9" y="10" width="6" height="8" fill="#7c3aed"/><rect x="1" y="8" width="2" height="4" fill="#5b21b6"/><rect x="5" y="8" width="2" height="4" fill="#5b21b6"/><rect x="19" y="8" width="2" height="4" fill="#5b21b6"/><rect x="23" y="8" width="2" height="4" fill="#5b21b6"/><rect x="10" y="8" width="2" height="4" fill="#5b21b6"/><rect x="14" y="8" width="2" height="4" fill="#5b21b6"/><rect x="10" y="16" width="4" height="6" fill="#4c1d95"/><rect x="4" y="16" width="3" height="3" fill="#ddd6fe"/><rect x="17" y="16" width="3" height="3" fill="#ddd6fe"/></svg>`,
+  forest: `<svg viewBox="0 0 24 24" width="28" height="28"><rect x="10" y="2" width="4" height="2" fill="#166534"/><rect x="8" y="4" width="8" height="2" fill="#16a34a"/><rect x="6" y="6" width="12" height="2" fill="#22c55e"/><rect x="8" y="8" width="8" height="2" fill="#16a34a"/><rect x="6" y="10" width="12" height="2" fill="#22c55e"/><rect x="10" y="12" width="4" height="10" fill="#92400e"/><rect x="0" y="16" width="6" height="6" fill="#15803d"/><rect x="18" y="16" width="6" height="6" fill="#15803d"/></svg>`,
+  river:  `<svg viewBox="0 0 24 24" width="28" height="28"><rect x="0" y="0" width="24" height="8" fill="#bfdbfe"/><rect x="0" y="8" width="24" height="8" fill="#60a5fa"/><rect x="0" y="16" width="24" height="8" fill="#3b82f6"/><rect x="2" y="4" width="4" height="2" fill="#fff" opacity="0.5"/><rect x="10" y="10" width="6" height="2" fill="#fff" opacity="0.4"/><rect x="16" y="18" width="4" height="2" fill="#93c5fd" opacity="0.6"/></svg>`,
+  mountain:`<svg viewBox="0 0 24 24" width="28" height="28"><rect x="8" y="4" width="2" height="2" fill="#fff"/><rect x="6" y="6" width="6" height="2" fill="#e5e7eb"/><rect x="4" y="8" width="10" height="2" fill="#d1d5db"/><rect x="2" y="10" width="14" height="2" fill="#9ca3af"/><rect x="0" y="12" width="18" height="10" fill="#6b7280"/><rect x="14" y="8" width="2" height="2" fill="#fff"/><rect x="12" y="10" width="6" height="2" fill="#e5e7eb"/><rect x="10" y="12" width="10" height="10" fill="#4b5563"/></svg>`,
+  boss:   `<svg viewBox="0 0 24 24" width="28" height="28"><rect x="8" y="2" width="8" height="2" fill="#dc2626"/><rect x="6" y="4" width="12" height="2" fill="#ef4444"/><rect x="4" y="6" width="16" height="2" fill="#dc2626"/><rect x="2" y="8" width="20" height="2" fill="#b91c1c"/><rect x="4" y="10" width="2" height="2" fill="#fef2f2"/><rect x="18" y="10" width="2" height="2" fill="#fef2f2"/><rect x="6" y="10" width="12" height="4" fill="#991b1b"/><rect x="8" y="14" width="2" height="2" fill="#fca5a5"/><rect x="14" y="14" width="2" height="2" fill="#fca5a5"/><rect x="6" y="16" width="12" height="6" fill="#7f1d1d"/><rect x="10" y="12" width="4" height="2" fill="#fecaca"/></svg>`,
+  locked: `<svg viewBox="0 0 24 24" width="28" height="28"><rect x="7" y="11" width="10" height="9" fill="#9ca3af" rx="1"/><rect x="9" y="7" width="6" height="6" fill="none" stroke="#9ca3af" stroke-width="2"/><rect x="11" y="14" width="2" height="3" fill="#e5e7eb"/></svg>`,
+  done:   `<svg viewBox="0 0 24 24" width="28" height="28"><rect x="2" y="2" width="20" height="20" fill="#10b981" rx="2"/><polyline points="5,12 10,17 19,7" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="square"/></svg>`,
+};
+
+// 8bit 캐릭터 픽셀 아트 (6종)
+const PIXEL_CHARS = [
+  // 보라 전사
+  `<svg viewBox="0 0 16 20" width="40" height="50" style="image-rendering:pixelated"><rect x="5" y="0" width="6" height="6" fill="#fde68a"/><rect x="4" y="1" width="1" height="4" fill="#fde68a"/><rect x="11" y="1" width="1" height="4" fill="#fde68a"/><rect x="6" y="2" width="1" height="1" fill="#1e1b4b"/><rect x="9" y="2" width="1" height="1" fill="#1e1b4b"/><rect x="5" y="4" width="6" height="1" fill="#dc2626"/><rect x="4" y="6" width="8" height="6" fill="#7c3aed"/><rect x="2" y="7" width="2" height="4" fill="#7c3aed"/><rect x="12" y="7" width="2" height="4" fill="#7c3aed"/><rect x="5" y="12" width="3" height="5" fill="#3b82f6"/><rect x="8" y="12" width="3" height="5" fill="#3b82f6"/><rect x="4" y="17" width="3" height="3" fill="#1e40af"/><rect x="9" y="17" width="3" height="3" fill="#1e40af"/></svg>`,
+  // 초록 아처
+  `<svg viewBox="0 0 16 20" width="40" height="50" style="image-rendering:pixelated"><rect x="5" y="0" width="6" height="6" fill="#fcd34d"/><rect x="4" y="1" width="1" height="4" fill="#fcd34d"/><rect x="11" y="1" width="1" height="4" fill="#fcd34d"/><rect x="6" y="2" width="1" height="1" fill="#1e1b4b"/><rect x="9" y="2" width="1" height="1" fill="#1e1b4b"/><rect x="6" y="4" width="4" height="1" fill="#92400e"/><rect x="4" y="6" width="8" height="6" fill="#16a34a"/><rect x="2" y="7" width="2" height="4" fill="#16a34a"/><rect x="12" y="7" width="2" height="4" fill="#16a34a"/><rect x="5" y="12" width="3" height="5" fill="#854d0e"/><rect x="8" y="12" width="3" height="5" fill="#854d0e"/><rect x="4" y="17" width="3" height="3" fill="#78350f"/><rect x="9" y="17" width="3" height="3" fill="#78350f"/></svg>`,
+  // 파랑 마법사
+  `<svg viewBox="0 0 16 20" width="40" height="50" style="image-rendering:pixelated"><rect x="4" y="0" width="8" height="2" fill="#7c3aed"/><rect x="5" y="1" width="6" height="5" fill="#fde68a"/><rect x="4" y="2" width="1" height="3" fill="#fde68a"/><rect x="11" y="2" width="1" height="3" fill="#fde68a"/><rect x="6" y="3" width="1" height="1" fill="#1e1b4b"/><rect x="9" y="3" width="1" height="1" fill="#1e1b4b"/><rect x="4" y="6" width="8" height="6" fill="#2563eb"/><rect x="2" y="7" width="2" height="4" fill="#2563eb"/><rect x="12" y="7" width="2" height="4" fill="#2563eb"/><rect x="1" y="9" width="2" height="2" fill="#fbbf24"/><rect x="5" y="12" width="6" height="5" fill="#1d4ed8"/><rect x="4" y="17" width="3" height="3" fill="#1e3a8a"/><rect x="9" y="17" width="3" height="3" fill="#1e3a8a"/></svg>`,
+  // 빨강 기사
+  `<svg viewBox="0 0 16 20" width="40" height="50" style="image-rendering:pixelated"><rect x="4" y="0" width="8" height="3" fill="#6b7280"/><rect x="5" y="1" width="6" height="5" fill="#fde68a"/><rect x="4" y="2" width="1" height="3" fill="#6b7280"/><rect x="11" y="2" width="1" height="3" fill="#6b7280"/><rect x="6" y="3" width="1" height="1" fill="#1e1b4b"/><rect x="9" y="3" width="1" height="1" fill="#1e1b4b"/><rect x="4" y="6" width="8" height="6" fill="#dc2626"/><rect x="2" y="7" width="2" height="4" fill="#dc2626"/><rect x="12" y="7" width="2" height="4" fill="#dc2626"/><rect x="5" y="12" width="6" height="5" fill="#b91c1c"/><rect x="4" y="17" width="3" height="3" fill="#7f1d1d"/><rect x="9" y="17" width="3" height="3" fill="#7f1d1d"/><rect x="13" y="6" width="2" height="8" fill="#9ca3af"/></svg>`,
+  // 노랑 도적
+  `<svg viewBox="0 0 16 20" width="40" height="50" style="image-rendering:pixelated"><rect x="5" y="0" width="6" height="6" fill="#fde68a"/><rect x="4" y="1" width="1" height="4" fill="#fde68a"/><rect x="11" y="1" width="1" height="4" fill="#fde68a"/><rect x="5" y="0" width="6" height="2" fill="#78350f"/><rect x="6" y="2" width="1" height="1" fill="#1e1b4b"/><rect x="9" y="2" width="1" height="1" fill="#1e1b4b"/><rect x="4" y="6" width="8" height="6" fill="#d97706"/><rect x="2" y="7" width="2" height="4" fill="#d97706"/><rect x="12" y="7" width="2" height="4" fill="#d97706"/><rect x="5" y="12" width="3" height="5" fill="#92400e"/><rect x="8" y="12" width="3" height="5" fill="#92400e"/><rect x="4" y="17" width="3" height="3" fill="#78350f"/><rect x="9" y="17" width="3" height="3" fill="#78350f"/></svg>`,
+  // 분홍 힐러
+  `<svg viewBox="0 0 16 20" width="40" height="50" style="image-rendering:pixelated"><rect x="5" y="0" width="6" height="6" fill="#fde68a"/><rect x="4" y="1" width="1" height="4" fill="#fde68a"/><rect x="11" y="1" width="1" height="4" fill="#fde68a"/><rect x="6" y="2" width="1" height="1" fill="#1e1b4b"/><rect x="9" y="2" width="1" height="1" fill="#1e1b4b"/><rect x="5" y="4" width="6" height="2" fill="#f9a8d4"/><rect x="4" y="6" width="8" height="6" fill="#ec4899"/><rect x="2" y="7" width="2" height="4" fill="#ec4899"/><rect x="12" y="7" width="2" height="4" fill="#ec4899"/><rect x="10" y="7" width="2" height="2" fill="#fff"/><rect x="11" y="6" width="2" height="4" fill="#fff" opacity="0.5"/><rect x="5" y="12" width="3" height="5" fill="#be185d"/><rect x="8" y="12" width="3" height="5" fill="#be185d"/><rect x="4" y="17" width="3" height="3" fill="#9d174d"/><rect x="9" y="17" width="3" height="3" fill="#9d174d"/></svg>`,
+];
+
+const CHAR_TITLES = ['헬스 루키','운동 전사','피트니스 챔피언','철의 의지','전설의 몸짱'];
 
 let gMember = null, gXP = 0, gLevel = 1, gChar = { body:0, color:0 };
-let gMissions = GAME_MISSIONS.map(m => ({...m, done:false}));
+let gDailyMissions   = DAILY_MISSIONS.map(m => ({...m, done:false}));
+let gMonthlyMissions = MONTHLY_MISSIONS.map(m => ({...m, done:false}));
 let gFriends = [], gActiveTab = 'map';
+
+/* ── 오늘이 월간 미션 등장 주인가? (매달 1일~7일) ── */
+function isMonthlyMissionWeek() {
+  return new Date().getDate() <= 7;
+}
 
 function renderMemberOnlyApp(member) {
   gMember = member;
   gChar = member.character && Object.keys(member.character).length ? member.character : { body:0, color:0 };
 
   const app = document.getElementById('app');
-  app.style.cssText = 'background:#f0f4ff';
+  app.style.cssText = 'background:#0f172a;max-width:480px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;font-family:-apple-system,sans-serif';
   app.innerHTML = `
-    <div style="background:linear-gradient(135deg,#7c3aed,#06b6d4);padding:calc(14px + env(safe-area-inset-top)) 18px 14px;flex-shrink:0">
+    <div style="background:#1e1b4b;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;flex-shrink:0;border-bottom:3px solid #312e81">
       <div style="display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.75);letter-spacing:1px">FITLOG</div>
-          <div style="font-size:18px;font-weight:900;color:#fff" id="g-name">${member.name}님</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="image-rendering:pixelated">${PIXEL_CHARS[gChar.body]}</div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#a78bfa;letter-spacing:2px;font-family:monospace">FITLOG RPG</div>
+            <div style="font-size:15px;font-weight:900;color:#fff;font-family:monospace">${member.name}</div>
+          </div>
         </div>
         <div style="text-align:right">
-          <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,0.75)" id="g-level-label">Lv.1 헬스 루키</div>
-          <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
-            <div style="flex:1;height:6px;background:rgba(255,255,255,0.25);border-radius:10px;width:100px;overflow:hidden">
-              <div id="g-xp-bar" style="height:100%;background:#fff;border-radius:10px;transition:width 1s;width:0%"></div>
+          <div style="font-size:10px;color:#a78bfa;font-family:monospace;font-weight:700" id="g-level-label">LV.1</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
+            <div style="font-size:10px;color:#a78bfa;font-family:monospace">XP</div>
+            <div style="width:80px;height:8px;background:#312e81;border:1px solid #4c1d95;position:relative;overflow:hidden">
+              <div id="g-xp-bar" style="height:100%;background:#a78bfa;transition:width 0.8s;width:0%"></div>
+              <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(0,0,0,0.15) 3px,rgba(0,0,0,0.15) 4px)"></div>
             </div>
-            <div style="font-size:11px;color:#fff;font-weight:700" id="g-xp-text">0 XP</div>
+            <div style="font-size:10px;color:#e9d5ff;font-family:monospace;font-weight:700" id="g-xp-text">0</div>
           </div>
         </div>
       </div>
     </div>
 
     <div style="flex:1;overflow:hidden;position:relative">
-      <div id="gtab-map"   style="display:flex;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:14px 14px calc(80px + env(safe-area-inset-bottom))"></div>
-      <div id="gtab-char"  style="display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:14px 14px calc(80px + env(safe-area-inset-bottom));gap:12px"></div>
-      <div id="gtab-rec"   style="display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:14px 14px calc(80px + env(safe-area-inset-bottom));gap:12px"></div>
-      <div id="gtab-rank"  style="display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:14px 14px calc(80px + env(safe-area-inset-bottom));gap:12px"></div>
+      <div id="gtab-map"  style="display:flex;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:12px 12px calc(76px + env(safe-area-inset-bottom))"></div>
+      <div id="gtab-char" style="display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:12px 12px calc(76px + env(safe-area-inset-bottom));gap:10px"></div>
+      <div id="gtab-rec"  style="display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:12px 12px calc(76px + env(safe-area-inset-bottom));gap:10px"></div>
+      <div id="gtab-rank" style="display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;flex-direction:column;padding:12px 12px calc(76px + env(safe-area-inset-bottom));gap:10px"></div>
     </div>
 
-    <div style="flex-shrink:0;display:flex;background:#fff;border-top:1px solid #e5e7eb;padding:6px 0 calc(6px + env(safe-area-inset-bottom))">
-      <button class="gnav" id="gnav-map"  onclick="gShowTab('map')"  style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#9ca3af;font-size:10px;font-weight:700;cursor:pointer;padding:4px 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>모험 맵
+    <div style="flex-shrink:0;display:flex;background:#1e1b4b;border-top:3px solid #312e81;padding:6px 0 calc(6px + env(safe-area-inset-bottom))">
+      <button id="gnav-map"  onclick="gShowTab('map')"  style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#6d28d9;font-size:9px;font-weight:700;cursor:pointer;padding:4px 0;font-family:monospace">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/></svg>MAP
       </button>
-      <button class="gnav" id="gnav-char" onclick="gShowTab('char')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#9ca3af;font-size:10px;font-weight:700;cursor:pointer;padding:4px 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>캐릭터
+      <button id="gnav-char" onclick="gShowTab('char')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#6d28d9;font-size:9px;font-weight:700;cursor:pointer;padding:4px 0;font-family:monospace">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>CHAR
       </button>
-      <button class="gnav" id="gnav-rec"  onclick="gShowTab('rec')"  style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#9ca3af;font-size:10px;font-weight:700;cursor:pointer;padding:4px 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>수업기록
+      <button id="gnav-rec"  onclick="gShowTab('rec')"  style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#6d28d9;font-size:9px;font-weight:700;cursor:pointer;padding:4px 0;font-family:monospace">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>LOG
       </button>
-      <button class="gnav" id="gnav-rank" onclick="gShowTab('rank')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#9ca3af;font-size:10px;font-weight:700;cursor:pointer;padding:4px 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 20 18 10"/><polyline points="12 20 12 4"/><polyline points="6 20 6 14"/></svg>랭킹
+      <button id="gnav-rank" onclick="gShowTab('rank')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:#6d28d9;font-size:9px;font-weight:700;cursor:pointer;padding:4px 0;font-family:monospace">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 20 18 10"/><polyline points="12 20 12 4"/><polyline points="6 20 6 14"/></svg>RANK
       </button>
     </div>`;
 
@@ -349,7 +389,7 @@ async function loadGameData(member) {
   const [{ count }, { data: rec }, { data: friendData }] = await Promise.all([
     sb.from('workout_records').select('*',{count:'exact',head:true}).eq('member_id', member.id),
     sb.from('workout_records').select('*,exercises(*)').eq('member_id', member.id).order('recorded_at',{ascending:false}).limit(5),
-    sb.from('friendships').select('friend_id, members!friendships_friend_id_fkey(id,name,xp,character)').eq('member_id', member.id)
+    sb.from('friendships').select('friend_id, members!friendships_friend_id_fkey(id,name,xp,character,public_rank)').eq('member_id', member.id)
   ]);
 
   gXP = member.xp || (count || 0) * 100;
@@ -360,82 +400,114 @@ async function loadGameData(member) {
   renderGameMap();
   renderCharTab();
   renderRecTab(rec || []);
-  renderRankTab();
   gShowTab('map');
 }
 
 function updateHeader() {
   const xpInLevel = gXP % 100;
-  const title = CHAR_TITLES[Math.min(Math.floor(gXP / 100 / 5), CHAR_TITLES.length - 1)];
-  document.getElementById('g-level-label').textContent = `Lv.${gLevel} ${title}`;
-  document.getElementById('g-xp-bar').style.width = xpInLevel + '%';
-  document.getElementById('g-xp-text').textContent = `${xpInLevel}/100 XP`;
+  const title = CHAR_TITLES[Math.min(Math.floor(gXP / 500), CHAR_TITLES.length - 1)];
+  const lbl = document.getElementById('g-level-label');
+  const bar = document.getElementById('g-xp-bar');
+  const txt = document.getElementById('g-xp-text');
+  if (lbl) lbl.textContent = `LV.${gLevel} ${title}`;
+  if (bar) bar.style.width = xpInLevel + '%';
+  if (txt) txt.textContent = `${xpInLevel}/100`;
 }
 
-/* ── 모험 맵 ── */
+/* ══════════════════════════════
+   8-BIT 모험 맵
+══════════════════════════════ */
 function renderGameMap() {
   const el = document.getElementById('gtab-map');
-  const totalDone = gMissions.filter(m => m.done).length;
-  const todayXP = gMissions.filter(m => m.done).reduce((s,m) => s+m.xp, 0);
+  const daily = gDailyMissions;
+  const showMonthly = isMonthlyMissionWeek();
+  const allMissions = showMonthly ? [...daily, ...gMonthlyMissions] : daily;
+  const totalDone = allMissions.filter(m => m.done).length;
+  const todayXP = allMissions.filter(m => m.done).reduce((s,m) => s+m.xp, 0);
+
+  // 지그재그 위치 계산 (좌/우 교번)
+  const positions = allMissions.map((_, i) => i % 2 === 0 ? 'left' : 'right');
 
   let html = `
-    <div style="background:#fff;border-radius:16px;padding:14px 16px;border:1px solid #e5e7eb;margin-bottom:4px;display:flex;align-items:center;gap:12px">
-      <div style="font-size:32px">${CHAR_BODIES[gChar.body]}</div>
+    <div style="background:#1e1b4b;border:2px solid #312e81;border-radius:4px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+      <div style="image-rendering:pixelated;flex-shrink:0">${PIXEL_CHARS[gChar.body]}</div>
       <div style="flex:1">
-        <div style="font-size:13px;font-weight:800;color:#1e1b4b">오늘의 모험</div>
-        <div style="font-size:12px;color:#6b7280;margin-top:2px">${totalDone}/${gMissions.length} 스테이지 완료 · +${todayXP} XP 획득</div>
-        <div style="height:5px;background:#f3f4f6;border-radius:10px;margin-top:6px;overflow:hidden">
-          <div style="height:100%;background:linear-gradient(90deg,#7c3aed,#06b6d4);border-radius:10px;width:${Math.round(totalDone/gMissions.length*100)}%;transition:width 0.6s"></div>
+        <div style="font-size:11px;font-weight:700;color:#a78bfa;font-family:monospace">TODAY'S QUEST</div>
+        <div style="font-size:10px;color:#818cf8;font-family:monospace;margin-top:2px">${totalDone}/${allMissions.length} CLEAR · +${todayXP} XP</div>
+        <div style="height:6px;background:#312e81;border:1px solid #4c1d95;margin-top:5px;overflow:hidden;position:relative">
+          <div style="height:100%;background:#a78bfa;width:${Math.round(totalDone/allMissions.length*100)}%;transition:width 0.6s"></div>
+          <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent,transparent 3px,rgba(0,0,0,0.2) 3px,rgba(0,0,0,0.2) 4px)"></div>
         </div>
       </div>
+      ${todayXP >= 100 ? '<div style="font-size:20px;animation:pixelBounce 0.5s infinite alternate">⭐</div>' : ''}
     </div>
-    <div style="position:relative;padding:10px 0">`;
 
-  gMissions.forEach((m, i) => {
+    <div style="position:relative;padding:4px 0">
+      <div style="position:absolute;left:50%;top:0;bottom:0;width:2px;background:repeating-linear-gradient(to bottom,#312e81 0,#312e81 6px,transparent 6px,transparent 10px);transform:translateX(-50%);z-index:0"></div>`;
+
+  allMissions.forEach((m, i) => {
     const done = m.done;
-    const isNext = !done && (i === 0 || gMissions[i-1].done);
+    const isNext = !done && (i === 0 || allMissions[i-1].done);
     const locked = !done && !isNext;
-    const isLast = i === gMissions.length - 1;
+    const isMonthly = m.terrain === 'boss';
+    const pos = positions[i];
 
-    const stageColor = done ? '#10b981' : isNext ? '#7c3aed' : '#d1d5db';
-    const stageBg    = done ? '#d1fae5' : isNext ? '#ede9fe' : '#f9fafb';
-    const textColor  = done ? '#065f46' : isNext ? '#4c1d95' : '#9ca3af';
+    const terrain = done ? 'done' : locked ? 'locked' : m.terrain;
+    const terrainSvg = PIXEL_TERRAINS[terrain] || PIXEL_TERRAINS.locked;
 
-    // path connector (except last)
-    const connectorHtml = !isLast ? `
-      <div style="display:flex;justify-content:center;padding:2px 0">
-        <div style="width:3px;height:28px;background:${done ? '#10b981' : '#e5e7eb'};border-radius:2px"></div>
-      </div>` : '';
+    const nodeBg   = done ? '#064e3b' : isNext ? '#312e81' : '#1e1b4b';
+    const nodeBdr  = done ? '#10b981' : isNext ? '#a78bfa' : '#374151';
+    const labelBg  = done ? '#064e3b' : isNext ? '#1e1b4b' : '#111827';
+    const labelBdr = done ? '#10b981' : isNext ? '#7c3aed' : '#374151';
+    const textCol  = done ? '#6ee7b7' : isNext ? '#e9d5ff' : '#4b5563';
+    const xpCol    = done ? '#10b981' : isNext ? '#a78bfa' : '#374151';
+
+    const isLeft = pos === 'left';
 
     html += `
-      <div style="display:flex;align-items:center;gap:12px;padding:0 8px">
-        <div style="display:flex;flex-direction:column;align-items:center">
-          <div onclick="${locked ? '' : `gToggleMission(${i})`}"
-            style="width:52px;height:52px;border-radius:50%;background:${stageBg};border:3px solid ${stageColor};display:flex;align-items:center;justify-content:center;font-size:22px;cursor:${locked?'default':'pointer'};position:relative;transition:all 0.2s;flex-shrink:0">
-            ${done ? '✅' : locked ? '🔒' : m.icon}
-            ${isNext ? `<div style="position:absolute;inset:-4px;border-radius:50%;border:2px solid #7c3aed;animation:ringPulse 1.5s infinite"></div>` : ''}
+      <div style="display:flex;align-items:center;justify-content:center;margin:6px 0;position:relative;z-index:1;gap:8px;flex-direction:${isLeft?'row':'row-reverse'}">
+
+        <div style="flex:1;max-width:160px;${isLeft?'text-align:right':'text-align:left'}">
+          ${isMonthly && !locked ? `<div style="font-size:9px;font-weight:700;color:#fbbf24;font-family:monospace;${isLeft?'text-align:right':'text-align:left'};margin-bottom:2px;animation:pixelBlink 1s infinite">★ MONTHLY</div>` : ''}
+          <div onclick="${locked?'':(`gToggleMission(${i})`)}"
+            style="display:inline-block;background:${labelBg};border:2px solid ${labelBdr};border-radius:2px;padding:7px 10px;cursor:${locked?'default':'pointer'};transition:all 0.15s">
+            <div style="font-size:11px;font-weight:700;color:${textCol};font-family:monospace">${m.text}</div>
+            <div style="font-size:9px;color:${xpCol};font-family:monospace;margin-top:2px">+${m.xp} XP${done?' ✓':''}</div>
           </div>
         </div>
-        <div onclick="${locked ? '' : `gToggleMission(${i})`}"
-          style="flex:1;background:${stageBg};border:2px solid ${stageColor};border-radius:14px;padding:12px 14px;cursor:${locked?'default':'pointer'};transition:all 0.2s">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div style="font-size:13px;font-weight:800;color:${textColor}">${m.text}</div>
-            <div style="font-size:11px;font-weight:800;color:${done?'#10b981':isNext?'#7c3aed':'#9ca3af'};background:${done?'#d1fae5':isNext?'#ede9fe':'#f3f4f6'};padding:3px 8px;border-radius:10px">+${m.xp} XP</div>
-          </div>
-          <div style="font-size:11px;color:${locked?'#9ca3af':'#6b7280'};margin-top:3px">${locked ? '🔒 이전 스테이지를 먼저 클리어하세요' : m.sub}</div>
+
+        <div onclick="${locked?'':(`gToggleMission(${i})`)}"
+          style="width:56px;height:56px;background:${nodeBg};border:3px solid ${nodeBdr};border-radius:2px;display:flex;align-items:center;justify-content:center;cursor:${locked?'default':'pointer'};flex-shrink:0;position:relative;image-rendering:pixelated;${isNext?'box-shadow:0 0 0 3px #7c3aed,0 0 12px #7c3aed66':''}">
+          ${terrainSvg}
+          ${isNext ? `<div style="position:absolute;inset:-5px;border:2px solid #a78bfa;border-radius:2px;animation:pixelPulse 1s infinite;pointer-events:none"></div>` : ''}
         </div>
-      </div>
-      ${connectorHtml}`;
+
+        <div style="flex:1;max-width:160px"></div>
+      </div>`;
+
+    // 연결선 (마지막 제외)
+    if (i < allMissions.length - 1) {
+      html += `<div style="height:12px;display:flex;justify-content:center;position:relative;z-index:1">
+        <div style="width:3px;height:12px;background:${done?'#10b981':'#312e81'}"></div>
+      </div>`;
+    }
   });
 
   html += `</div>`;
 
-  // 100 XP 달성 배너
+  if (!showMonthly) {
+    html += `<div style="background:#1e1b4b;border:2px solid #374151;border-radius:2px;padding:12px 14px;margin-top:6px;text-align:center">
+      <div style="font-size:10px;color:#6b7280;font-family:monospace">★ MONTHLY QUEST</div>
+      <div style="font-size:11px;color:#4b5563;font-family:monospace;margin-top:4px">매달 1~7일에 특별 미션 등장!</div>
+      <div style="font-size:10px;color:#374151;font-family:monospace;margin-top:2px">체지방 감소 확인 · 근력 증가 확인</div>
+    </div>`;
+  }
+
   if (todayXP >= 100) {
-    html += `<div style="background:linear-gradient(135deg,#f59e0b,#ef4444);border-radius:16px;padding:16px;text-align:center;color:#fff;margin-top:4px">
-      <div style="font-size:24px">🎉</div>
-      <div style="font-size:15px;font-weight:900;margin-top:4px">레벨업 달성!</div>
-      <div style="font-size:12px;opacity:0.85;margin-top:2px">오늘 목표를 모두 완료했어요</div>
+    html += `<div style="background:linear-gradient(135deg,#312e81,#1e1b4b);border:3px solid #fbbf24;border-radius:2px;padding:16px;text-align:center;margin-top:8px">
+      <div style="font-size:28px;animation:pixelBounce 0.4s infinite alternate">⭐</div>
+      <div style="font-size:14px;font-weight:900;color:#fbbf24;font-family:monospace;margin-top:6px;letter-spacing:2px">LEVEL UP!</div>
+      <div style="font-size:10px;color:#a78bfa;font-family:monospace;margin-top:4px">오늘 목표 달성! 대단해요!</div>
     </div>`;
   }
 
@@ -443,17 +515,16 @@ function renderGameMap() {
 }
 
 async function gToggleMission(i) {
-  gMissions[i].done = !gMissions[i].done;
-  const gained = gMissions[i].done ? gMissions[i].xp : -gMissions[i].xp;
+  const allMissions = isMonthlyMissionWeek() ? [...gDailyMissions, ...gMonthlyMissions] : gDailyMissions;
+  const m = allMissions[i];
+  m.done = !m.done;
+  const gained = m.done ? m.xp : -m.xp;
   gXP = Math.max(0, gXP + gained);
   gLevel = Math.floor(gXP / 100) + 1;
-
-  // XP 팝업
-  if (gMissions[i].done) {
-    showGameToast(`${gMissions[i].icon} +${gMissions[i].xp} XP!`);
-    if (gXP % 100 < gMissions[i].xp) showGameToast('🎊 레벨 UP!');
+  if (m.done) {
+    showGameToast(`+${m.xp} XP GET!`);
+    if (gXP % 100 < m.xp) showGameToast('★ LEVEL UP!');
   }
-
   await sb.from('members').update({ xp: gXP }).eq('id', gMember.id);
   updateHeader();
   renderGameMap();
@@ -462,77 +533,91 @@ async function gToggleMission(i) {
 /* ── 캐릭터 탭 ── */
 function renderCharTab() {
   const el = document.getElementById('gtab-char');
+  const isPublic = gMember.public_rank !== false;
   el.innerHTML = `
-    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:20px;text-align:center">
-      <div style="font-size:72px;line-height:1;margin-bottom:8px" id="char-preview">${CHAR_BODIES[gChar.body]}</div>
-      <div style="font-size:16px;font-weight:900;color:#1e1b4b">${gMember.name}</div>
-      <div style="font-size:12px;font-weight:700;color:#7c3aed;margin-top:4px">Lv.${gLevel} · ${CHAR_TITLES[Math.min(Math.floor(gXP/500), CHAR_TITLES.length-1)]}</div>
-      <div style="display:inline-flex;align-items:center;gap:6px;background:#fef3c7;border-radius:20px;padding:4px 14px;margin-top:8px">
-        <span style="font-size:13px">⭐</span>
-        <span style="font-size:13px;font-weight:800;color:#92400e">${gXP} XP 누적</span>
+    <div style="background:#1e1b4b;border:2px solid #312e81;border-radius:2px;padding:16px;text-align:center">
+      <div style="image-rendering:pixelated;display:inline-block;margin-bottom:8px">${PIXEL_CHARS[gChar.body]}</div>
+      <div style="font-size:14px;font-weight:900;color:#e9d5ff;font-family:monospace">${gMember.name}</div>
+      <div style="font-size:10px;color:#a78bfa;font-family:monospace;margin-top:4px">LV.${gLevel} · ${CHAR_TITLES[Math.min(Math.floor(gXP/500),4)]}</div>
+      <div style="display:inline-flex;align-items:center;gap:6px;background:#312e81;border:1px solid #4c1d95;border-radius:2px;padding:4px 12px;margin-top:8px">
+        <span style="font-size:11px;color:#fbbf24;font-family:monospace">★ ${gXP} XP TOTAL</span>
       </div>
     </div>
 
-    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:16px">
-      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:12px">캐릭터 선택</div>
-      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px">
-        ${CHAR_BODIES.map((b,i) => `
-          <div onclick="gSelectBody(${i})" style="font-size:28px;text-align:center;padding:8px;border-radius:12px;border:2px solid ${gChar.body===i?'#7c3aed':'#e5e7eb'};background:${gChar.body===i?'#ede9fe':'#f9fafb'};cursor:pointer">${b}</div>
-        `).join('')}
-      </div>
-      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:10px">컬러 선택</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        ${CHAR_COLORS.map((c,i) => `
-          <div onclick="gSelectColor(${i})" style="width:36px;height:36px;border-radius:50%;background:${c};border:3px solid ${gChar.color===i?'#1e1b4b':'transparent'};cursor:pointer;transition:all 0.2s"></div>
+    <div style="background:#1e1b4b;border:2px solid #312e81;border-radius:2px;padding:14px">
+      <div style="font-size:10px;font-weight:700;color:#a78bfa;font-family:monospace;letter-spacing:2px;margin-bottom:10px">CHARACTER SELECT</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">
+        ${PIXEL_CHARS.map((c,i) => `
+          <div onclick="gSelectBody(${i})" style="padding:6px;border:2px solid ${gChar.body===i?'#a78bfa':'#312e81'};background:${gChar.body===i?'#312e81':'#0f172a'};border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;image-rendering:pixelated">${c}</div>
         `).join('')}
       </div>
     </div>
 
-    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:16px">
-      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:12px">내 배지</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${gXP>=50?'<div style="background:#ede9fe;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;color:#7c3aed">🏅 첫 출석</div>':''}
-        ${gXP>=100?'<div style="background:#d1fae5;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;color:#065f46">⭐ 100 XP 달성</div>':''}
-        ${gXP>=500?'<div style="background:#fef3c7;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;color:#92400e">🔥 500 XP 달성</div>':''}
-        ${gXP<50?'<div style="color:#9ca3af;font-size:13px">미션을 완료하면 배지를 획득해요!</div>':''}
+    <div style="background:#1e1b4b;border:2px solid #312e81;border-radius:2px;padding:14px">
+      <div style="font-size:10px;font-weight:700;color:#a78bfa;font-family:monospace;letter-spacing:2px;margin-bottom:10px">BADGES</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${gXP>=50?`<div style="background:#312e81;border:1px solid #7c3aed;border-radius:2px;padding:5px 10px;font-size:10px;font-weight:700;color:#a78bfa;font-family:monospace">🏅 FIRST STEP</div>`:''}
+        ${gXP>=100?`<div style="background:#064e3b;border:1px solid #10b981;border-radius:2px;padding:5px 10px;font-size:10px;font-weight:700;color:#6ee7b7;font-family:monospace">⭐ 100 XP</div>`:''}
+        ${gXP>=500?`<div style="background:#78350f;border:1px solid #f59e0b;border-radius:2px;padding:5px 10px;font-size:10px;font-weight:700;color:#fbbf24;font-family:monospace">🔥 500 XP</div>`:''}
+        ${gXP<50?`<div style="font-size:11px;color:#374151;font-family:monospace">미션을 완료하면 배지 획득!</div>`:''}
+      </div>
+    </div>
+
+    <div style="background:#1e1b4b;border:2px solid #312e81;border-radius:2px;padding:14px">
+      <div style="font-size:10px;font-weight:700;color:#a78bfa;font-family:monospace;letter-spacing:2px;margin-bottom:10px">PRIVACY</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:#e9d5ff;font-family:monospace">랭킹 공개</div>
+          <div style="font-size:10px;color:#6b7280;font-family:monospace;margin-top:2px">${isPublic ? '다른 회원에게 내 순위가 보여요' : '내 정보가 랭킹에서 숨겨져요'}</div>
+        </div>
+        <div onclick="togglePublicRank()" style="width:44px;height:24px;background:${isPublic?'#7c3aed':'#374151'};border:2px solid ${isPublic?'#a78bfa':'#4b5563'};border-radius:2px;position:relative;cursor:pointer;transition:all 0.2s">
+          <div style="position:absolute;top:2px;${isPublic?'right:2px':'left:2px'};width:16px;height:16px;background:#fff;border-radius:1px;transition:all 0.2s"></div>
+        </div>
       </div>
     </div>`;
 }
 
-async function gSelectBody(i) {
-  gChar.body = i;
-  document.getElementById('char-preview').textContent = CHAR_BODIES[i];
-  await sb.from('members').update({ character: gChar }).eq('id', gMember.id);
+async function togglePublicRank() {
+  const newVal = gMember.public_rank === false ? true : false;
+  gMember.public_rank = newVal;
+  await sb.from('members').update({ public_rank: newVal }).eq('id', gMember.id);
   renderCharTab();
+  showGameToast(newVal ? '랭킹 공개로 변경!' : '랭킹 비공개로 변경!');
 }
 
-async function gSelectColor(i) {
-  gChar.color = i;
+async function gSelectBody(i) {
+  gChar.body = i;
   await sb.from('members').update({ character: gChar }).eq('id', gMember.id);
+  // 헤더 캐릭터도 업데이트
+  const headerChar = document.querySelector('[style*="image-rendering:pixelated"]');
   renderCharTab();
+  renderGameMap();
 }
 
 /* ── 수업 기록 탭 ── */
 function renderRecTab(records) {
   const el = document.getElementById('gtab-rec');
-  if (!records.length) { el.innerHTML = '<div class="empty">아직 수업 기록이 없어요</div>'; return; }
+  if (!records.length) {
+    el.innerHTML = `<div style="text-align:center;padding:60px 20px;color:#374151;font-size:12px;font-family:monospace">아직 수업 기록이 없어요</div>`;
+    return;
+  }
   const nums = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
   el.innerHTML = records.map(r => {
     const exs = (r.exercises||[]).sort((a,b)=>a.order_num-b.order_num);
     const date = new Date(r.recorded_at).toLocaleDateString('ko-KR',{month:'long',day:'numeric'});
-    return `<div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:14px 16px">
-      <div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:10px">${date}</div>
+    return `<div style="background:#1e1b4b;border:2px solid #312e81;border-radius:2px;padding:12px 14px">
+      <div style="font-size:10px;color:#6b7280;font-family:monospace;margin-bottom:8px">${date}</div>
       ${exs.map((e,i)=>{
-        const v=[e.weight?e.weight+'kg':'',e.reps?e.reps+'회':'',e.sets?e.sets+'세트':''].filter(Boolean).join(' × ');
-        return `<div style="display:flex;flex-direction:column;padding:7px 0;border-bottom:1px solid #f3f4f6">
+        const v=[e.weight?e.weight+'kg':'',e.reps?e.reps+'회':'',e.sets?e.sets+'세트':''].filter(Boolean).join('×');
+        return `<div style="padding:6px 0;border-bottom:1px solid #1e293b">
           <div style="display:flex;justify-content:space-between">
-            <span style="font-size:13px;font-weight:700">${nums[i]||i+1} ${e.name}</span>
-            <span style="font-size:12px;color:#6b7280">${v}</span>
+            <span style="font-size:12px;font-weight:700;color:#e9d5ff;font-family:monospace">${nums[i]||i+1} ${e.name}</span>
+            <span style="font-size:11px;color:#a78bfa;font-family:monospace">${v}</span>
           </div>
-          ${e.memo?`<div style="font-size:11px;color:#92400e;background:#fef3c7;border-radius:6px;padding:3px 8px;margin-top:4px">💬 ${e.memo}</div>`:''}
+          ${e.memo?`<div style="font-size:10px;color:#fbbf24;font-family:monospace;margin-top:3px">▶ ${e.memo}</div>`:''}
         </div>`;
       }).join('')}
-      ${r.note?`<div style="font-size:11px;color:#92400e;background:#fef3c7;border-radius:8px;padding:7px 10px;margin-top:8px">${r.note}</div>`:''}
+      ${r.note?`<div style="font-size:10px;color:#fbbf24;background:#312e81;border:1px solid #4c1d95;border-radius:2px;padding:6px 8px;margin-top:8px;font-family:monospace">★ ${r.note}</div>`:''}
     </div>`;
   }).join('');
 }
@@ -540,36 +625,41 @@ function renderRecTab(records) {
 /* ── 랭킹 탭 ── */
 async function renderRankTab() {
   const el = document.getElementById('gtab-rank');
+  el.innerHTML = `<div style="text-align:center;padding:30px;color:#4b5563;font-family:monospace;font-size:11px">LOADING...</div>`;
 
-  const { data: allMembers } = await sb.from('members').select('id,name,xp,character').order('xp',{ascending:false}).limit(20);
-  const meIdx = (allMembers||[]).findIndex(m => m.id === gMember.id);
+  // 공개 설정된 회원 + 친구만
+  const { data: allMembers } = await sb.from('members')
+    .select('id,name,xp,character,public_rank')
+    .or(`public_rank.eq.true,id.eq.${gMember.id}`)
+    .order('xp',{ascending:false}).limit(30);
+
+  const medals = ['🥇','🥈','🥉'];
 
   let html = `
-    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:14px 16px">
-      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:12px">🏆 전체 랭킹</div>
-      ${(allMembers||[]).map((m, i) => {
+    <div style="background:#1e1b4b;border:2px solid #312e81;border-radius:2px;padding:12px 14px">
+      <div style="font-size:10px;font-weight:700;color:#a78bfa;font-family:monospace;letter-spacing:2px;margin-bottom:10px">🏆 RANKING</div>
+      ${(allMembers||[]).map((m,i) => {
         const isMe = m.id === gMember.id;
-        const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
-        const char = m.character && m.character.body !== undefined ? CHAR_BODIES[m.character.body] : '🧑';
-        return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f3f4f6;${isMe?'background:#f5f3ff;border-radius:10px;padding:9px 10px;margin:2px -4px':''}">
-          <div style="font-size:${i<3?'20px':'13px'};font-weight:800;min-width:24px;text-align:center">${medal}</div>
-          <div style="font-size:22px">${char}</div>
+        const char = m.character?.body !== undefined ? PIXEL_CHARS[m.character.body] : PIXEL_CHARS[0];
+        return `<div style="display:flex;align-items:center;gap:8px;padding:8px ${isMe?'8px':'0'};border-bottom:1px solid #1e293b;${isMe?'background:#312e81;border-radius:2px;margin:2px -4px':''}">
+          <div style="font-size:${i<3?'16px':'11px'};font-weight:700;min-width:22px;text-align:center;font-family:monospace;color:${i===0?'#fbbf24':i===1?'#9ca3af':i===2?'#d97706':'#4b5563'}">${i<3?medals[i]:i+1}</div>
+          <div style="image-rendering:pixelated;flex-shrink:0">${char}</div>
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:${isMe?900:700};color:${isMe?'#7c3aed':'#1e1b4b'}">${m.name}${isMe?' (나)':''}</div>
-            <div style="font-size:11px;color:#9ca3af">Lv.${Math.floor((m.xp||0)/100)+1} · ${m.xp||0} XP</div>
+            <div style="font-size:12px;font-weight:${isMe?900:700};color:${isMe?'#a78bfa':'#e9d5ff'};font-family:monospace">${m.name}${isMe?' ◀':''}</div>
+            <div style="font-size:10px;color:#6b7280;font-family:monospace">LV.${Math.floor((m.xp||0)/100)+1} · ${m.xp||0} XP</div>
           </div>
         </div>`;
       }).join('')}
     </div>
 
-    <div style="background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:14px 16px">
-      <div style="font-size:11px;font-weight:800;color:#9ca3af;letter-spacing:1px;margin-bottom:6px">👥 친구 추가</div>
-      <div style="font-size:12px;color:#6b7280;margin-bottom:10px;line-height:1.6">다른 회원의 링크에서 ID를 복사해서 입력하세요</div>
-      <div style="display:flex;gap:8px">
-        <input id="friend-id-input" placeholder="친구 ID 붙여넣기" style="flex:1;background:#f5f3ff;border:1.5px solid #e5e7eb;border-radius:10px;color:#1e1b4b;font-size:13px;padding:9px 12px;outline:none">
-        <button onclick="addFriend()" style="padding:9px 16px;background:#7c3aed;border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer">추가</button>
+    <div style="background:#1e1b4b;border:2px solid #312e81;border-radius:2px;padding:12px 14px">
+      <div style="font-size:10px;font-weight:700;color:#a78bfa;font-family:monospace;letter-spacing:2px;margin-bottom:6px">ADD FRIEND</div>
+      <div style="font-size:10px;color:#6b7280;font-family:monospace;margin-bottom:8px;line-height:1.6">친구의 ID를 입력하면 함께 경쟁할 수 있어요</div>
+      <div style="display:flex;gap:6px">
+        <input id="friend-id-input" placeholder="친구 ID..." style="flex:1;background:#0f172a;border:2px solid #312e81;color:#e9d5ff;font-size:12px;padding:8px 10px;outline:none;font-family:monospace;border-radius:2px">
+        <button onclick="addFriend()" style="padding:8px 14px;background:#7c3aed;border:2px solid #a78bfa;color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:monospace;border-radius:2px">ADD</button>
       </div>
-      <div style="margin-top:8px;font-size:11px;color:#9ca3af">내 ID: <span onclick="copyMyId()" style="color:#7c3aed;font-weight:700;cursor:pointer">${gMember.id.slice(0,8)}... (탭하여 복사)</span></div>
+      <div style="margin-top:6px;font-size:10px;color:#4b5563;font-family:monospace">MY ID: <span onclick="copyMyId()" style="color:#a78bfa;cursor:pointer">${gMember.id.slice(0,8)}... [TAP TO COPY]</span></div>
     </div>`;
 
   el.innerHTML = html;
@@ -578,21 +668,19 @@ async function renderRankTab() {
 async function addFriend() {
   const input = document.getElementById('friend-id-input');
   const rawId = input.value.trim();
-  if (!rawId) { showGameToast('ID를 입력해주세요'); return; }
-
-  const { data: found } = await sb.from('members').select('id,name').ilike('id', rawId + '%').limit(1).maybeSingle();
-  if (!found) { showGameToast('회원을 찾을 수 없어요'); return; }
-  if (found.id === gMember.id) { showGameToast('나 자신은 추가할 수 없어요'); return; }
-
+  if (!rawId) { showGameToast('ID 입력!'); return; }
+  const { data: found } = await sb.from('members').select('id,name').ilike('id', rawId+'%').limit(1).maybeSingle();
+  if (!found) { showGameToast('NOT FOUND'); return; }
+  if (found.id === gMember.id) { showGameToast('자기 자신!'); return; }
   await sb.from('friendships').upsert({ member_id: gMember.id, friend_id: found.id });
   input.value = '';
-  showGameToast(found.name + '님과 친구가 됐어요! 👥');
+  showGameToast(found.name + ' ADDED!');
   renderRankTab();
 }
 
 function copyMyId() {
   navigator.clipboard.writeText(gMember.id);
-  showGameToast('내 ID 복사됨!');
+  showGameToast('ID COPIED!');
 }
 
 /* ── 탭 전환 ── */
@@ -602,7 +690,7 @@ function gShowTab(tab) {
     const el = document.getElementById('gtab-'+t);
     if (el) el.style.display = t === tab ? 'flex' : 'none';
     const nav = document.getElementById('gnav-'+t);
-    if (nav) nav.style.color = t === tab ? '#7c3aed' : '#9ca3af';
+    if (nav) nav.style.color = t === tab ? '#a78bfa' : '#4c1d95';
   });
   if (tab === 'rank') renderRankTab();
 }
@@ -612,7 +700,7 @@ function showGameToast(msg) {
   if (!t) {
     t = document.createElement('div');
     t.id = 'game-toast';
-    t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#7c3aed;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:999;white-space:nowrap';
+    t.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#312e81;border:2px solid #a78bfa;color:#e9d5ff;padding:8px 18px;font-size:12px;font-weight:700;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:999;white-space:nowrap;font-family:monospace;border-radius:2px';
     document.body.appendChild(t);
   }
   t.textContent = msg;
