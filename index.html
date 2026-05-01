@@ -4,234 +4,239 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="FitLog">
   <title>FitLog</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
-      --bg:#0f0f13;--bg2:#1a1a22;--bg3:#22222e;
-      --accent:#7c6bff;--success:#4ecdc4;--warn:#ffd166;--danger:#ff6b6b;
-      --text:#f0eeff;--text2:#9b97b8;
-      --border:rgba(124,107,255,0.18);--card:#1e1e2a;
-      --radius:14px;--radius-sm:8px;
+      --bg: #f5f3ff;
+      --bg2: #ede9fe;
+      --bg3: #fff;
+      --accent: #7c3aed;
+      --accent-light: #ede9fe;
+      --accent2: #06b6d4;
+      --success: #10b981;
+      --success-light: #d1fae5;
+      --warn: #f59e0b;
+      --warn-light: #fef3c7;
+      --danger: #ef4444;
+      --pink: #ec4899;
+      --pink-light: #fce7f3;
+      --text: #1e1b4b;
+      --text2: #6b7280;
+      --text3: #9ca3af;
+      --border: #e5e7eb;
+      --card: #ffffff;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
     }
-    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-    html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;}
-    .app{max-width:480px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;}
-    .topbar{padding:calc(14px + env(safe-area-inset-top)) 20px 14px;border-bottom:1px solid var(--border);flex-shrink:0;}
-    .topbar-row{display:flex;align-items:center;justify-content:space-between;}
-    .topbar-title{font-size:20px;font-weight:800;letter-spacing:-0.5px;}
-    .mode-toggle{display:flex;background:var(--bg3);border-radius:20px;padding:3px;gap:2px;}
-    .mode-btn{font-size:12px;font-weight:700;padding:6px 14px;border-radius:16px;border:none;cursor:pointer;transition:all 0.2s;color:var(--text2);background:transparent;}
-    .mode-btn.active{background:var(--accent);color:#fff;}
-    .screens{flex:1;overflow:hidden;position:relative;}
-    .screen{display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px calc(80px + env(safe-area-inset-bottom));flex-direction:column;gap:12px;}
-    .screen.active{display:flex;}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;flex-shrink:0;}
-    .card-title{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;}
-    .member-chips{display:flex;gap:8px;flex-wrap:wrap;min-height:32px;}
-    .chip{padding:7px 14px;border-radius:20px;font-size:13px;font-weight:600;border:1.5px solid var(--border);cursor:pointer;color:var(--text2);background:transparent;transition:all 0.2s;white-space:nowrap;}
-    .chip.selected{border-color:var(--accent);color:var(--accent);background:rgba(124,107,255,0.1);}
-    .add-member-row{display:flex;gap:8px;margin-top:10px;}
-    .text-input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;padding:9px 12px;outline:none;font-family:inherit;}
-    .text-input:focus{border-color:var(--accent);}
-    .btn-sm{padding:9px 16px;background:var(--accent);border:none;border-radius:var(--radius-sm);color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
-    .btn-sm:active{background:#6a5ae0;}
-    .upload-area{border:1.5px dashed rgba(124,107,255,0.35);border-radius:var(--radius);padding:28px 16px;text-align:center;cursor:pointer;position:relative;overflow:hidden;}
-    .upload-area input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
-    .upload-icon{width:48px;height:48px;border-radius:50%;background:rgba(124,107,255,0.15);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;}
-    .upload-icon svg{width:24px;height:24px;stroke:var(--accent);}
-    .upload-text{font-size:14px;font-weight:700;color:var(--text);}
-    .upload-sub{font-size:12px;color:var(--text2);margin-top:4px;}
-    .preview-img{width:100%;border-radius:var(--radius-sm);max-height:200px;object-fit:cover;margin-top:10px;display:none;}
-    .ai-status{display:flex;align-items:center;gap:10px;padding:12px 16px;background:rgba(78,205,196,0.08);border:1px solid rgba(78,205,196,0.2);border-radius:var(--radius-sm);}
-    .ai-dot{width:8px;height:8px;border-radius:50%;background:var(--success);flex-shrink:0;}
-    .ai-dot.loading{animation:pulse 1s infinite;background:var(--warn);}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-    .ai-label{font-size:12px;font-weight:600;}
-    .ai-label.loading{color:var(--warn);}
-    .ai-label.done{color:var(--success);}
-    .exercise-list{display:flex;flex-direction:column;gap:8px;}
-    .exercise-item{background:var(--bg3);border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:flex-start;gap:10px;}
-    .ex-num{width:24px;height:24px;border-radius:50%;background:rgba(124,107,255,0.2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);flex-shrink:0;margin-top:3px;}
-    .ex-body{flex:1;display:flex;flex-direction:column;gap:7px;}
-    .ex-name-input{font-size:13px;font-weight:600;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);width:100%;padding:2px 0;outline:none;}
-    .ex-name-input:focus{border-color:var(--accent);}
-    .ex-vals{display:flex;gap:6px;align-items:center;}
-    .ex-val-wrap{display:flex;flex-direction:column;align-items:center;gap:2px;}
-    .ex-val-label{font-size:9px;color:var(--text2);}
-    .ex-val-input{width:52px;font-size:13px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;color:var(--text);text-align:center;padding:5px 4px;outline:none;}
-    .ex-val-input:focus{border-color:var(--accent);}
-    .ex-sep{font-size:14px;color:var(--text2);margin-top:14px;}
-    .ex-del{width:24px;height:24px;border-radius:50%;background:rgba(255,80,80,0.1);border:none;cursor:pointer;color:var(--danger);font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:3px;}
-    .add-ex-btn{width:100%;padding:10px;border:1.5px dashed var(--border);border-radius:var(--radius-sm);background:transparent;color:var(--text2);font-size:13px;cursor:pointer;margin-top:4px;}
-    .note-input{width:100%;background:rgba(255,209,102,0.06);border:1px solid rgba(255,209,102,0.2);border-radius:var(--radius-sm);color:var(--text);font-size:13px;padding:10px 12px;resize:none;outline:none;font-family:inherit;min-height:64px;}
-    .note-input:focus{border-color:var(--warn);}
-    .save-btn{width:100%;padding:16px;background:var(--accent);border:none;border-radius:var(--radius);color:#fff;font-size:15px;font-weight:800;cursor:pointer;}
-    .save-btn:active{background:#6a5ae0;transform:scale(0.98);}
-    .save-btn:disabled{background:var(--bg3);color:var(--text2);}
-    .history-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
-    .history-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-    .history-member{font-size:14px;font-weight:700;}
-    .history-date{font-size:12px;color:var(--text2);}
-    .ex-tags{display:flex;gap:6px;flex-wrap:wrap;}
-    .ex-tag{font-size:11px;padding:3px 10px;background:rgba(124,107,255,0.1);border-radius:10px;color:var(--accent);font-weight:600;}
-    .history-note{font-size:11px;color:var(--warn);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
-    .member-header{background:var(--card);border-radius:var(--radius);padding:16px;display:flex;gap:14px;align-items:center;}
-    .avatar{width:52px;height:52px;border-radius:50%;background:rgba(124,107,255,0.2);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:var(--accent);flex-shrink:0;}
-    .level-badge{display:inline-flex;align-items:center;background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.25);border-radius:10px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--success);}
-    .xp-bar-bg{height:6px;background:var(--bg3);border-radius:10px;overflow:hidden;margin:7px 0 4px;}
-    .xp-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--success));border-radius:10px;transition:width 0.8s;}
-    .stat-row{display:flex;gap:8px;}
-    .stat-card{flex:1;background:var(--bg3);border-radius:var(--radius-sm);padding:12px;text-align:center;}
-    .stat-num{font-size:24px;font-weight:800;}
-    .stat-label{font-size:10px;color:var(--text2);margin-top:3px;}
-    .mission-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);}
-    .mission-row:last-child{border-bottom:none;}
-    .m-check{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
-    .m-check.done{background:var(--success);border-color:var(--success);}
-    .m-check svg{width:11px;height:11px;stroke:#fff;opacity:0;transition:opacity 0.2s;}
-    .m-check.done svg{opacity:1;}
-    .m-text{flex:1;font-size:13px;}
-    .m-text.done{text-decoration:line-through;color:var(--text2);}
-    .m-xp{font-size:12px;font-weight:700;color:var(--accent);}
-    .record-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
-    .record-row:last-child{border-bottom:none;}
-    .record-name{font-size:13px;font-weight:600;}
-    .record-val{font-size:12px;color:var(--text2);}
-    .record-note{background:rgba(255,209,102,0.08);border-left:3px solid var(--warn);border-radius:0 var(--radius-sm) var(--radius-sm) 0;padding:8px 12px;margin-top:10px;font-size:12px;color:var(--warn);}
-    .member-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;}
-    .member-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px 10px;text-align:center;cursor:pointer;transition:all 0.2s;}
-    .member-card:active{border-color:var(--accent);background:rgba(124,107,255,0.08);}
-    .member-card-avatar{width:42px;height:42px;border-radius:50%;background:rgba(124,107,255,0.15);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:var(--accent);margin:0 auto 8px;}
-    .member-card-name{font-size:13px;font-weight:600;}
-    .bottom-nav{flex-shrink:0;display:flex;background:var(--bg);border-top:1px solid var(--border);padding:8px 0 calc(8px + env(safe-area-inset-bottom));}
-    .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:none;background:transparent;color:var(--text2);font-size:10px;font-weight:600;cursor:pointer;padding:4px 0;transition:color 0.2s;}
-    .nav-btn.active{color:var(--accent);}
-    .nav-btn svg{width:22px;height:22px;}
-    .toast{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--success);color:#0a1f1e;padding:11px 22px;border-radius:22px;font-size:13px;font-weight:700;opacity:0;transition:opacity 0.3s;pointer-events:none;z-index:100;white-space:nowrap;}
-    .toast.show{opacity:1;}
-    .overlay{position:fixed;inset:0;background:rgba(15,15,19,0.8);display:none;align-items:center;justify-content:center;z-index:200;}
-    .overlay.show{display:flex;}
-    .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
-    @keyframes spin{to{transform:rotate(360deg);}}
-    .empty{text-align:center;padding:60px 20px;color:var(--text2);font-size:14px;line-height:2;}
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: -apple-system, 'Apple SD Gothic Neo', sans-serif; }
+    .app { max-width: 480px; margin: 0 auto; height: 100dvh; display: flex; flex-direction: column; }
+
+    /* topbar */
+    .topbar { padding: calc(14px + env(safe-area-inset-top)) 20px 14px; background: var(--card); border-bottom: 1px solid var(--border); flex-shrink: 0; box-shadow: var(--shadow); }
+    .topbar-row { display: flex; align-items: center; justify-content: space-between; }
+    .topbar-title { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .mode-toggle { display: flex; background: var(--bg2); border-radius: 20px; padding: 3px; gap: 2px; }
+    .mode-btn { font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 16px; border: none; cursor: pointer; transition: all 0.2s; color: var(--text2); background: transparent; }
+    .mode-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(124,58,237,0.3); }
+
+    /* screens */
+    .screens { flex: 1; overflow: hidden; position: relative; }
+    .screen { display: none; position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 16px 14px calc(88px + env(safe-area-inset-bottom)); flex-direction: column; gap: 12px; }
+    .screen.active { display: flex; }
+
+    /* cards */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; flex-shrink: 0; box-shadow: var(--shadow); }
+    .card-title { font-size: 11px; font-weight: 800; color: var(--text2); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
+
+    /* member chips */
+    .member-chips { display: flex; gap: 8px; flex-wrap: wrap; min-height: 34px; }
+    .chip { padding: 7px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; border: 1.5px solid var(--border); cursor: pointer; color: var(--text2); background: var(--bg); transition: all 0.2s; white-space: nowrap; }
+    .chip.selected { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+    .add-row { display: flex; gap: 8px; margin-top: 10px; }
+    .text-input { flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; padding: 9px 12px; outline: none; font-family: inherit; transition: border-color 0.2s; }
+    .text-input:focus { border-color: var(--accent); }
+    .btn-accent { padding: 9px 18px; background: var(--accent); border: none; border-radius: var(--radius-sm); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 8px rgba(124,58,237,0.25); }
+    .btn-accent:active { transform: scale(0.97); }
+
+    /* member link card */
+    .member-link-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .member-link-row:last-child { border-bottom: none; }
+    .member-link-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-light); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: var(--accent); flex-shrink: 0; }
+    .member-link-name { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); }
+    .copy-btn { font-size: 11px; font-weight: 700; padding: 5px 12px; background: var(--accent-light); color: var(--accent); border: none; border-radius: 20px; cursor: pointer; }
+    .copy-btn:active { background: var(--accent); color: #fff; }
+
+    /* input mode tabs */
+    .input-tabs { display: flex; gap: 0; background: var(--bg2); border-radius: var(--radius-sm); padding: 3px; }
+    .input-tab { flex: 1; text-align: center; padding: 8px; font-size: 12px; font-weight: 700; border-radius: 8px; cursor: pointer; color: var(--text2); border: none; background: transparent; transition: all 0.2s; }
+    .input-tab.active { background: var(--card); color: var(--accent); box-shadow: var(--shadow); }
+
+    /* upload */
+    .upload-area { border: 2px dashed #c4b5fd; border-radius: var(--radius); padding: 28px 16px; text-align: center; cursor: pointer; position: relative; overflow: hidden; background: var(--accent-light); transition: all 0.2s; }
+    .upload-area:active { background: #ddd6fe; }
+    .upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .upload-icon { width: 52px; height: 52px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; box-shadow: var(--shadow-md); }
+    .upload-icon svg { width: 26px; height: 26px; stroke: var(--accent); }
+    .upload-text { font-size: 14px; font-weight: 700; color: var(--accent); }
+    .upload-sub { font-size: 12px; color: #7c3aed99; margin-top: 4px; }
+    .preview-img { width: 100%; border-radius: var(--radius-sm); max-height: 200px; object-fit: cover; margin-top: 10px; display: none; }
+
+    /* manual input */
+    .manual-area { display: none; flex-direction: column; gap: 8px; }
+    .manual-area.active { display: flex; }
+    .manual-textarea { width: 100%; background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 13px; padding: 12px; resize: none; outline: none; font-family: inherit; min-height: 120px; line-height: 1.7; }
+    .manual-textarea:focus { border-color: var(--accent); }
+    .manual-hint { font-size: 11px; color: var(--text3); line-height: 1.6; background: var(--warn-light); border-radius: var(--radius-sm); padding: 10px 12px; }
+
+    /* ai status */
+    .ai-status { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--success-light); border: 1px solid #a7f3d0; border-radius: var(--radius-sm); }
+    .ai-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+    .ai-dot.loading { animation: pulse 1s infinite; background: var(--warn); }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.3} }
+    .ai-label { font-size: 12px; font-weight: 700; }
+    .ai-label.loading { color: var(--warn); }
+    .ai-label.done { color: var(--success); }
+
+    /* exercise list */
+    .exercise-list { display: flex; flex-direction: column; gap: 8px; }
+    .exercise-item { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; align-items: flex-start; gap: 10px; }
+    .ex-num { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: #fff; flex-shrink: 0; margin-top: 2px; }
+    .ex-body { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+    .ex-name-input { font-size: 13px; font-weight: 700; background: transparent; border: none; border-bottom: 1.5px solid var(--border); color: var(--text); width: 100%; padding: 2px 0; outline: none; }
+    .ex-name-input:focus { border-color: var(--accent); }
+    .ex-vals { display: flex; gap: 6px; align-items: center; }
+    .ex-val-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .ex-val-label { font-size: 9px; color: var(--text3); font-weight: 600; }
+    .ex-val-input { width: 52px; font-size: 13px; background: var(--card); border: 1.5px solid var(--border); border-radius: 8px; color: var(--text); text-align: center; padding: 5px 4px; outline: none; font-weight: 600; }
+    .ex-val-input:focus { border-color: var(--accent); }
+    .ex-sep { font-size: 14px; color: var(--text3); margin-top: 14px; font-weight: 700; }
+    .ex-del { width: 26px; height: 26px; border-radius: 50%; background: #fee2e2; border: none; cursor: pointer; color: var(--danger); font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+    .add-ex-btn { width: 100%; padding: 10px; border: 2px dashed #c4b5fd; border-radius: var(--radius-sm); background: var(--accent-light); color: var(--accent); font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+    .ex-memo-input { width: 100%; font-size: 11px; background: var(--warn-light); border: 1px solid #fcd34d; border-radius: 6px; color: var(--text); padding: 5px 8px; outline: none; font-family: inherit; resize: none; min-height: 32px; }
+    .ex-memo-input:focus { border-color: var(--warn); }
+    .ex-memo-toggle { font-size: 10px; font-weight: 700; color: var(--text3); background: none; border: none; cursor: pointer; padding: 2px 0; text-align: left; }
+    .ex-memo-toggle:hover { color: var(--warn); }
+    .record-ex-memo { font-size: 11px; color: #92400e; background: var(--warn-light); border-radius: 6px; padding: 4px 8px; margin-top: 4px; }
+
+    .note-input { width: 100%; background: var(--warn-light); border: 1.5px solid #fcd34d; border-radius: var(--radius-sm); color: var(--text); font-size: 13px; padding: 10px 12px; resize: none; outline: none; font-family: inherit; min-height: 64px; }
+    .note-input:focus { border-color: var(--warn); }
+
+    .save-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--accent), #6d28d9); border: none; border-radius: var(--radius); color: #fff; font-size: 15px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 14px rgba(124,58,237,0.35); }
+    .save-btn:active { transform: scale(0.98); }
+    .save-btn:disabled { background: var(--border); color: var(--text3); box-shadow: none; }
+
+    /* history */
+    .history-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+    .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .history-member { font-size: 14px; font-weight: 800; color: var(--text); }
+    .history-date { font-size: 12px; color: var(--text3); font-weight: 500; }
+    .ex-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ex-tag { font-size: 11px; padding: 3px 10px; background: var(--accent-light); border-radius: 10px; color: var(--accent); font-weight: 700; }
+    .history-note { font-size: 11px; color: #92400e; background: var(--warn-light); border-radius: 8px; padding: 7px 10px; margin-top: 8px; }
+
+    /* member home header */
+    .member-header { background: linear-gradient(135deg, var(--accent), #6d28d9); border-radius: var(--radius); padding: 20px; display: flex; gap: 14px; align-items: center; color: #fff; box-shadow: 0 4px 14px rgba(124,58,237,0.35); }
+    .avatar { width: 54px; height: 54px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #fff; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.4); }
+    .level-badge { display: inline-flex; align-items: center; background: rgba(255,255,255,0.2); border-radius: 10px; padding: 3px 10px; font-size: 11px; font-weight: 800; color: #fff; border: 1px solid rgba(255,255,255,0.3); }
+    .xp-bar-bg { height: 7px; background: rgba(255,255,255,0.2); border-radius: 10px; overflow: hidden; margin: 8px 0 5px; }
+    .xp-bar-fill { height: 100%; background: rgba(255,255,255,0.9); border-radius: 10px; transition: width 1s cubic-bezier(.34,1.56,.64,1); }
+    .xp-text { font-size: 11px; color: rgba(255,255,255,0.75); font-weight: 500; }
+
+    /* stat cards */
+    .stat-row { display: flex; gap: 8px; }
+    .stat-card { flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 8px; text-align: center; box-shadow: var(--shadow); }
+    .stat-num { font-size: 26px; font-weight: 900; }
+    .stat-label { font-size: 10px; color: var(--text2); margin-top: 2px; font-weight: 600; }
+
+    /* ===== GAMIFIED MISSIONS ===== */
+    .missions-grid { display: flex; flex-direction: column; gap: 10px; }
+    .mission-card {
+      background: var(--bg);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden;
+    }
+    .mission-card.done { background: var(--success-light); border-color: #6ee7b7; }
+    .mission-card.done::after {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(16,185,129,0.05), transparent);
+    }
+    .mission-card:active { transform: scale(0.98); }
+    .mission-icon-wrap {
+      width: 42px; height: 42px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0; transition: all 0.3s;
+    }
+    .mission-body { flex: 1; min-width: 0; }
+    .mission-title { font-size: 13px; font-weight: 700; color: var(--text); transition: color 0.2s; }
+    .mission-card.done .mission-title { color: #065f46; text-decoration: line-through; }
+    .mission-sub { font-size: 11px; color: var(--text3); margin-top: 2px; font-weight: 500; }
+    .mission-xp {
+      font-size: 12px; font-weight: 800;
+      padding: 4px 10px; border-radius: 20px;
+      background: var(--accent-light); color: var(--accent);
+      flex-shrink: 0; transition: all 0.2s;
+    }
+    .mission-card.done .mission-xp { background: var(--success-light); color: #065f46; }
+    .mission-check-icon {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2.5px solid var(--border); display: flex;
+      align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.3s;
+    }
+    .mission-card.done .mission-check-icon {
+      background: var(--success); border-color: var(--success);
+    }
+    .mission-check-icon svg { width: 14px; height: 14px; stroke: #fff; opacity: 0; transition: opacity 0.2s; }
+    .mission-card.done .mission-check-icon svg { opacity: 1; }
+
+    /* xp popup */
+    @keyframes xpPop { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-40px) scale(1.3)} }
+    .xp-popup { position: absolute; right: 14px; top: 50%; font-size: 16px; font-weight: 900; color: var(--success); pointer-events: none; animation: xpPop 0.8s forwards; }
+
+    /* streak flame */
+    .streak-flame { font-size: 22px; }
+
+    /* record rows */
+    .record-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+    .record-row:last-child { border-bottom: none; }
+    .record-name { font-size: 13px; font-weight: 700; color: var(--text); }
+    .record-val { font-size: 12px; color: var(--text2); font-weight: 500; }
+    .record-note { background: var(--warn-light); border-left: 3px solid var(--warn); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 8px 12px; margin-top: 10px; font-size: 12px; color: #92400e; font-weight: 500; }
+
+    /* nav */
+    .bottom-nav { flex-shrink: 0; display: flex; background: var(--card); border-top: 1px solid var(--border); padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); box-shadow: 0 -2px 10px rgba(0,0,0,0.06); }
+    .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; border: none; background: transparent; color: var(--text3); font-size: 10px; font-weight: 700; cursor: pointer; padding: 4px 0; transition: color 0.2s; }
+    .nav-btn.active { color: var(--accent); }
+    .nav-btn svg { width: 22px; height: 22px; }
+
+    .toast { position: fixed; bottom: calc(90px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; padding: 11px 22px; border-radius: 22px; font-size: 13px; font-weight: 700; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100; white-space: nowrap; box-shadow: 0 4px 14px rgba(124,58,237,0.35); }
+    .toast.show { opacity: 1; }
+    .overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); display: none; align-items: center; justify-content: center; z-index: 200; }
+    .overlay.show { display: flex; }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty { text-align: center; padding: 60px 20px; color: var(--text3); font-size: 14px; line-height: 2; font-weight: 500; }
+
+    /* member-only view (URL mode) */
+    .member-only-header { background: linear-gradient(135deg, var(--accent), var(--accent2)); padding: calc(20px + env(safe-area-inset-top)) 20px 20px; color: #fff; text-align: center; flex-shrink: 0; }
+    .member-only-title { font-size: 13px; font-weight: 700; opacity: 0.8; margin-bottom: 4px; }
+    .member-only-name { font-size: 24px; font-weight: 900; }
   </style>
 </head>
 <body>
-<div class="app">
-  <div class="topbar">
-    <div class="topbar-row">
-      <div class="topbar-title">FitLog</div>
-      <div class="mode-toggle">
-        <button class="mode-btn active" onclick="setMode('trainer',this)">트레이너</button>
-        <button class="mode-btn" onclick="setMode('member',this)">회원</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="screens">
-    <!-- 트레이너: 기록 입력 -->
-    <div class="screen active" id="screen-input">
-      <div class="card">
-        <div class="card-title">회원 선택</div>
-        <div class="member-chips" id="member-chips"></div>
-        <div class="add-member-row">
-          <input class="text-input" id="new-member-input" placeholder="새 회원 이름 입력" maxlength="10"
-            onkeydown="if(event.key==='Enter')addMember()">
-          <button class="btn-sm" onclick="addMember()">추가</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">손글씨 사진 업로드</div>
-        <div class="upload-area">
-          <input type="file" accept="image/*" capture="environment" id="photo-input" onchange="handlePhoto(event)">
-          <div class="upload-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
-          </div>
-          <div class="upload-text">카메라로 찍기</div>
-          <div class="upload-sub">AI가 손글씨를 자동으로 읽어드려요</div>
-        </div>
-        <img id="preview-img" class="preview-img">
-      </div>
-
-      <div id="ai-section" style="display:none">
-        <div class="ai-status">
-          <div class="ai-dot loading" id="ai-dot"></div>
-          <div class="ai-label loading" id="ai-label">AI가 손글씨를 읽는 중...</div>
-        </div>
-      </div>
-
-      <div id="result-section" style="display:none;flex-direction:column;gap:12px;">
-        <div class="card">
-          <div class="card-title">운동 목록 — 수정 가능해요</div>
-          <div class="exercise-list" id="exercise-list"></div>
-          <button class="add-ex-btn" onclick="addExercise()">+ 운동 추가</button>
-        </div>
-        <div class="card">
-          <div class="card-title">참고사항 (트레이너 메모)</div>
-          <textarea class="note-input" id="note-input" placeholder="참고사항을 입력하세요..." rows="2"></textarea>
-        </div>
-        <button class="save-btn" onclick="saveRecord()">저장하고 회원에게 전송</button>
-      </div>
-    </div>
-
-    <!-- 트레이너: 기록 보기 -->
-    <div class="screen" id="screen-history">
-      <div id="history-list" style="display:flex;flex-direction:column;gap:10px;">
-        <div class="empty">불러오는 중...</div>
-      </div>
-    </div>
-
-    <!-- 회원: 회원 선택 -->
-    <div class="screen" id="screen-member-select">
-      <div class="card">
-        <div class="card-title">나는 누구?</div>
-        <div class="member-grid" id="member-grid"></div>
-      </div>
-    </div>
-
-    <!-- 회원: 홈 -->
-    <div class="screen" id="screen-member-home">
-      <div class="member-header">
-        <div class="avatar" id="m-avatar">?</div>
-        <div style="flex:1">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-            <div style="font-size:17px;font-weight:800" id="m-name">회원님</div>
-            <div class="level-badge" id="m-level">Lv.1</div>
-          </div>
-          <div class="xp-bar-bg"><div class="xp-bar-fill" id="m-xp-fill" style="width:0%"></div></div>
-          <div style="font-size:11px;color:var(--text2)" id="m-xp-text">0 / 1000 XP</div>
-        </div>
-      </div>
-      <div class="stat-row">
-        <div class="stat-card"><div class="stat-num" style="color:var(--warn)" id="m-streak">0</div><div class="stat-label">일 연속 출석</div></div>
-        <div class="stat-card"><div class="stat-num" style="color:var(--accent)" id="m-total">0</div><div class="stat-label">총 수업 횟수</div></div>
-        <div class="stat-card"><div class="stat-num" style="color:var(--success)" id="m-missions">0</div><div class="stat-label">오늘 완료 미션</div></div>
-      </div>
-      <div class="card">
-        <div class="card-title">오늘의 미션</div>
-        <div id="mission-list"></div>
-      </div>
-      <div class="card" id="latest-card" style="display:none">
-        <div class="card-title">최근 수업 기록</div>
-        <div id="latest-content"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="bottom-nav" id="bottom-nav">
-    <button class="nav-btn active" id="nav-input" onclick="showScreen('input','nav-input')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>기록 입력
-    </button>
-    <button class="nav-btn" id="nav-history" onclick="showScreen('history','nav-history');loadHistory()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>기록 보기
-    </button>
+<div class="app" id="app">
+  <!-- 로딩 중 표시 -->
+  <div style="flex:1;display:flex;align-items:center;justify-content:center" id="init-loading">
+    <div class="spinner"></div>
   </div>
 </div>
 
@@ -243,24 +248,232 @@ const SB_URL = 'https://eeacryaijsbhiajdvgwe.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlYWNyeWFpanNiaGlhamR2Z3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTc4NzcsImV4cCI6MjA5MzE5Mzg3N30.ZbNzKnjhNHvCGtwkzEn3MLPzPqX7vSAtqmd7U1MTO4Y';
 const sb = supabase.createClient(SB_URL, SB_KEY);
 
-let members = [], selectedMember = null, exercises = [];
-let currentMember = null;
-let missions = [
-  {text:'수업 출석하기',xp:50,done:false},
-  {text:'유산소 20분',xp:30,done:false},
-  {text:'수분 섭취 기록',xp:20,done:false},
-  {text:'스트레칭 10분',xp:20,done:false},
+const MISSIONS = [
+  { text:'오늘 수업 출석', sub:'트레이너와 함께!', xp:50, icon:'🏋️', color:'#ede9fe' },
+  { text:'유산소 20분', sub:'걷기, 달리기, 자전거', xp:30, icon:'🏃', color:'#d1fae5' },
+  { text:'수분 2L 마시기', sub:'건강의 기본!', xp:20, icon:'💧', color:'#dbeafe' },
+  { text:'스트레칭 10분', sub:'마무리 필수', xp:20, icon:'🧘', color:'#fce7f3' },
 ];
 
+let members = [], selectedMember = null, exercises = [], inputMode = 'photo';
+let missions = MISSIONS.map(m => ({...m, done: false}));
+const urlParams = new URLSearchParams(window.location.search);
+const urlMemberId = urlParams.get('member');
+
 async function init() {
-  const { data } = await sb.from('members').select('*').order('created_at');
-  members = data || [];
+  if (urlMemberId) {
+    // 회원 전용 링크 — 회원 홈만 보여줌
+    const { data } = await sb.from('members').select('*').eq('id', urlMemberId).single();
+    if (!data) { document.getElementById('app').innerHTML = '<div style="padding:40px;text-align:center;color:#6b7280">잘못된 링크예요</div>'; return; }
+    renderMemberOnlyApp(data);
+  } else {
+    // 트레이너 앱
+    const { data } = await sb.from('members').select('*').order('created_at');
+    members = data || [];
+    renderTrainerApp();
+  }
+}
+
+/* ===================== 회원 전용 앱 ===================== */
+function renderMemberOnlyApp(member) {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="member-only-header">
+      <div class="member-only-title">FitLog</div>
+      <div class="member-only-name">${member.name}님의 기록</div>
+    </div>
+    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 30px;display:flex;flex-direction:column;gap:12px;" id="member-content">
+      <div class="empty">불러오는 중...</div>
+    </div>`;
+  loadMemberContent(member);
+}
+
+async function loadMemberContent(member) {
+  const el = document.getElementById('member-content');
+
+  const { count } = await sb.from('workout_records')
+    .select('*', { count: 'exact', head: true }).eq('member_id', member.id);
+  const total = count || 0;
+  const xp = total * 100;
+  const level = Math.floor(xp / 1000) + 1;
+  const xpIn = xp % 1000;
+
+  const { data: rec } = await sb.from('workout_records')
+    .select('*, exercises(*)').eq('member_id', member.id)
+    .order('recorded_at', { ascending: false }).limit(1).maybeSingle();
+
+  const missionDone = missions.filter(m => m.done).length;
+
+  el.innerHTML = `
+    <div class="member-header">
+      <div class="avatar">${member.name.slice(0,2)}</div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <div style="font-size:17px;font-weight:900">${member.name}님</div>
+          <div class="level-badge">Lv.${level}</div>
+        </div>
+        <div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${xpIn/10}%"></div></div>
+        <div class="xp-text">${xpIn} / 1000 XP</div>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-num" style="color:#f59e0b">${Math.min(total,7)}</div><div class="stat-label">🔥 연속 출석</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#7c3aed">${total}</div><div class="stat-label">💪 총 수업</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#10b981" id="solo-mission-count">${missionDone}</div><div class="stat-label">✅ 오늘 미션</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎮 오늘의 미션</div>
+      <div class="missions-grid" id="solo-missions"></div>
+    </div>
+
+    ${rec ? `
+    <div class="card">
+      <div class="card-title">📋 최근 수업 기록</div>
+      <div id="solo-record"></div>
+    </div>` : ''}`;
+
+  renderMissionsInto('solo-missions', 'solo-mission-count');
+
+  if (rec) {
+    const nums = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
+    const exs = (rec.exercises || []).sort((a,b) => a.order_num - b.order_num);
+    document.getElementById('solo-record').innerHTML =
+      exs.map((e,i) => {
+        const v = [e.weight?e.weight+'kg':'', e.reps?e.reps+'회':'', e.sets?e.sets+'세트':''].filter(Boolean).join(' × ');
+        return `<div class="record-row" style="flex-direction:column;align-items:flex-start;gap:2px">
+          <div style="display:flex;justify-content:space-between;width:100%">
+            <span class="record-name">${nums[i]||i+1} ${e.name}</span>
+            <span class="record-val">${v}</span>
+          </div>
+          ${e.memo ? `<div class="record-ex-memo">💬 ${e.memo}</div>` : ''}
+        </div>`;
+      }).join('') + (rec.note ? `<div class="record-note">${rec.note}</div>` : '');
+  }
+}
+
+/* ===================== 트레이너 앱 ===================== */
+function renderTrainerApp() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="topbar-row">
+        <div class="topbar-title">FitLog</div>
+        <div class="mode-toggle">
+          <button class="mode-btn active" onclick="setMode('trainer',this)">트레이너</button>
+          <button class="mode-btn" onclick="setMode('preview',this)">회원 미리보기</button>
+        </div>
+      </div>
+    </div>
+    <div class="screens">
+      <!-- 트레이너: 기록 입력 -->
+      <div class="screen active" id="screen-input">
+        <div class="card">
+          <div class="card-title">회원 선택</div>
+          <div class="member-chips" id="member-chips"></div>
+          <div class="add-row">
+            <input class="text-input" id="new-member-input" placeholder="새 회원 이름 입력" maxlength="10" onkeydown="if(event.key==='Enter')addMember()">
+            <button class="btn-accent" onclick="addMember()">추가</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">수업 내용 입력</div>
+          <div class="input-tabs" style="margin-bottom:14px">
+            <button class="input-tab active" id="tab-photo" onclick="switchInputTab('photo')">📷 사진으로</button>
+            <button class="input-tab" id="tab-text" onclick="switchInputTab('text')">✏️ 직접 입력</button>
+          </div>
+
+          <div id="photo-area">
+            <div class="upload-area">
+              <input type="file" accept="image/*" capture="environment" id="photo-input" onchange="handlePhoto(event)">
+              <div class="upload-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+              <div class="upload-text">카메라로 찍기</div>
+              <div class="upload-sub">AI가 손글씨를 자동으로 읽어드려요</div>
+            </div>
+            <img id="preview-img" class="preview-img">
+          </div>
+
+          <div class="manual-area" id="text-area">
+            <div class="manual-hint">
+              예시로 이렇게 쓰면 돼요:<br>
+              랫풀다운 10kg 10회 3세트<br>
+              스쿼트 20kg 12회 4세트
+            </div>
+            <textarea class="manual-textarea" id="manual-input" placeholder="운동 내용을 자유롭게 입력하세요..." rows="5"></textarea>
+            <button class="btn-accent" style="width:100%" onclick="parseManualInput()">AI로 정리하기</button>
+          </div>
+        </div>
+
+        <div id="ai-section" style="display:none">
+          <div class="ai-status">
+            <div class="ai-dot loading" id="ai-dot"></div>
+            <div class="ai-label loading" id="ai-label">AI가 내용을 정리하는 중...</div>
+          </div>
+        </div>
+
+        <div id="result-section" style="display:none;flex-direction:column;gap:12px;">
+          <div class="card">
+            <div class="card-title">운동 목록 — 수정 가능해요</div>
+            <div class="exercise-list" id="exercise-list"></div>
+            <button class="add-ex-btn" onclick="addExercise()">+ 운동 추가</button>
+          </div>
+          <div class="card">
+            <div class="card-title">참고사항 (트레이너 메모)</div>
+            <textarea class="note-input" id="note-input" placeholder="주의사항, 컨디션 등 메모..." rows="2"></textarea>
+          </div>
+          <button class="save-btn" onclick="saveRecord()">저장하고 회원에게 전송</button>
+        </div>
+      </div>
+
+      <!-- 트레이너: 기록 보기 -->
+      <div class="screen" id="screen-history">
+        <div id="history-list" style="display:flex;flex-direction:column;gap:10px;">
+          <div class="empty">불러오는 중...</div>
+        </div>
+      </div>
+
+      <!-- 트레이너: 회원 링크 -->
+      <div class="screen" id="screen-members">
+        <div class="card">
+          <div class="card-title">회원별 개인 링크</div>
+          <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+            링크를 복사해서 각 회원님께 보내주세요.<br>본인 기록만 볼 수 있어요 🔒
+          </div>
+          <div id="member-links"></div>
+        </div>
+      </div>
+
+      <!-- 회원 미리보기 -->
+      <div class="screen" id="screen-preview">
+        <div class="card" style="text-align:center;padding:20px">
+          <div style="font-size:13px;color:var(--text2);margin-bottom:12px">미리 볼 회원 선택</div>
+          <div class="member-chips" id="preview-chips" style="justify-content:center"></div>
+        </div>
+        <div id="preview-content"></div>
+      </div>
+    </div>
+
+    <div class="bottom-nav" id="bottom-nav">
+      <button class="nav-btn active" id="nav-input" onclick="showScreen('input','nav-input')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>기록 입력
+      </button>
+      <button class="nav-btn" id="nav-history" onclick="showScreen('history','nav-history');loadHistory()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>기록 보기
+      </button>
+      <button class="nav-btn" id="nav-members" onclick="showScreen('members','nav-members');renderMemberLinks()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>회원 링크
+      </button>
+    </div>`;
+
   renderChips();
-  renderMemberGrid();
+  renderPreviewChips();
 }
 
 function renderChips() {
   const el = document.getElementById('member-chips');
+  if (!el) return;
   el.innerHTML = '';
   members.forEach(m => {
     const c = document.createElement('button');
@@ -271,18 +484,38 @@ function renderChips() {
   });
 }
 
-function renderMemberGrid() {
-  const el = document.getElementById('member-grid');
-  el.innerHTML = members.length === 0
-    ? '<div style="color:var(--text2);font-size:13px;padding:8px 0">아직 등록된 회원이 없어요</div>'
-    : '';
+function renderPreviewChips() {
+  const el = document.getElementById('preview-chips');
+  if (!el) return;
+  el.innerHTML = '';
   members.forEach(m => {
-    const d = document.createElement('div');
-    d.className = 'member-card';
-    d.innerHTML = `<div class="member-card-avatar">${m.name.slice(0,2)}</div><div class="member-card-name">${m.name}</div>`;
-    d.onclick = () => loadMemberHome(m);
-    el.appendChild(d);
+    const c = document.createElement('button');
+    c.className = 'chip';
+    c.textContent = m.name;
+    c.onclick = () => loadPreview(m, c);
+    el.appendChild(c);
   });
+}
+
+function renderMemberLinks() {
+  const el = document.getElementById('member-links');
+  if (!el) return;
+  if (!members.length) { el.innerHTML = '<div class="empty" style="padding:20px 0">아직 등록된 회원이 없어요</div>'; return; }
+  el.innerHTML = '';
+  members.forEach(m => {
+    const url = `${location.origin}${location.pathname}?member=${m.id}`;
+    const div = document.createElement('div');
+    div.className = 'member-link-row';
+    div.innerHTML = `
+      <div class="member-link-avatar">${m.name.slice(0,2)}</div>
+      <div class="member-link-name">${m.name}</div>
+      <button class="copy-btn" onclick="copyLink('${url}','${m.name}')">링크 복사</button>`;
+    el.appendChild(div);
+  });
+}
+
+function copyLink(url, name) {
+  navigator.clipboard.writeText(url).then(() => showToast(name + '님 링크 복사됨!'));
 }
 
 async function addMember() {
@@ -297,8 +530,18 @@ async function addMember() {
   members.push(data);
   inp.value = '';
   renderChips();
-  renderMemberGrid();
+  renderPreviewChips();
   showToast(name + '님 추가 완료!');
+}
+
+function switchInputTab(mode) {
+  inputMode = mode;
+  document.getElementById('tab-photo').classList.toggle('active', mode === 'photo');
+  document.getElementById('tab-text').classList.toggle('active', mode === 'text');
+  document.getElementById('photo-area').style.display = mode === 'photo' ? 'block' : 'none';
+  document.getElementById('text-area').classList.toggle('active', mode === 'text');
+  document.getElementById('ai-section').style.display = 'none';
+  document.getElementById('result-section').style.display = 'none';
 }
 
 function handlePhoto(e) {
@@ -309,48 +552,64 @@ function handlePhoto(e) {
     const img = document.getElementById('preview-img');
     img.src = ev.target.result;
     img.style.display = 'block';
-    runAI(ev.target.result);
+    runAI({ type: 'image', data: ev.target.result });
   };
   reader.readAsDataURL(file);
 }
 
-async function runAI(imageData) {
+async function parseManualInput() {
+  const text = document.getElementById('manual-input').value.trim();
+  if (!text) { showToast('내용을 입력해주세요'); return; }
+  runAI({ type: 'text', data: text });
+}
+
+async function runAI({ type, data }) {
   document.getElementById('ai-section').style.display = 'block';
   document.getElementById('result-section').style.display = 'none';
   document.getElementById('ai-dot').className = 'ai-dot loading';
   const lbl = document.getElementById('ai-label');
   lbl.className = 'ai-label loading';
-  lbl.textContent = 'AI가 손글씨를 읽는 중...';
+  lbl.textContent = 'AI가 내용을 정리하는 중...';
 
-  const base64 = imageData.split(',')[1];
-  const mediaType = imageData.split(';')[0].split(':')[1];
+  let content;
+  if (type === 'image') {
+    const base64 = data.split(',')[1];
+    const mediaType = data.split(';')[0].split(':')[1];
+    content = [
+      { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+      { type: 'text', text: `손글씨 수업 메모에서 운동 목록과 참고사항만 추출. 동그라미 번호 순서대로.
+반드시 JSON만 출력 (다른 텍스트 없이):
+{"exercises":[{"name":"운동이름","weight":"무게숫자만","reps":"횟수숫자만","sets":"세트숫자만"}],"note":"참고사항"}
+없는 값은 빈 문자열. 단위(kg,회,세트) 제외.` }
+    ];
+  } else {
+    content = [{ type: 'text', text: `다음 운동 기록 텍스트에서 운동 목록과 참고사항을 추출해줘.
+반드시 JSON만 출력 (다른 텍스트 없이):
+{"exercises":[{"name":"운동이름","weight":"무게숫자만","reps":"횟수숫자만","sets":"세트숫자만"}],"note":"참고사항"}
+없는 값은 빈 문자열. 단위(kg,회,세트) 제외.
+
+입력:
+${data}` }];
+  }
+
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514', max_tokens: 1000,
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-          { type: 'text', text: `손글씨 수업 메모에서 운동 목록과 참고사항만 추출. 동그라미 번호 순서대로.
-반드시 JSON만 출력 (다른 텍스트 없이):
-{"exercises":[{"name":"운동이름","weight":"무게숫자만","reps":"횟수숫자만","sets":"세트숫자만"}],"note":"참고사항"}
-없는 값은 빈 문자열. 단위(kg,회,세트) 제외하고 숫자만.` }
-        ]}]
-      })
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content }] })
     });
     const d = await res.json();
-    const parsed = JSON.parse(d.content.map(i=>i.text||'').join('').replace(/```json|```/g,'').trim());
+    const parsed = JSON.parse(d.content.map(i => i.text || '').join('').replace(/```json|```/g, '').trim());
     exercises = parsed.exercises || [];
     document.getElementById('note-input').value = parsed.note || '';
   } catch {
-    exercises = [{ name:'', weight:'', reps:'', sets:'' }];
+    exercises = [{ name: '', weight: '', reps: '', sets: '' }];
     document.getElementById('note-input').value = '';
-    showToast('인식 오류 — 직접 입력해주세요');
+    showToast('인식 오류 — 직접 수정해주세요');
   }
 
   lbl.className = 'ai-label done';
-  lbl.textContent = '인식 완료! 확인하고 수정하세요';
+  lbl.textContent = '정리 완료! 확인하고 수정하세요';
   document.getElementById('ai-dot').className = 'ai-dot';
   renderExercises();
   document.getElementById('result-section').style.display = 'flex';
@@ -362,28 +621,51 @@ function renderExercises() {
   exercises.forEach((ex, i) => {
     const div = document.createElement('div');
     div.className = 'exercise-item';
+    div.style.flexDirection = 'column';
+    div.style.gap = '8px';
     div.innerHTML = `
-      <div class="ex-num">${i+1}</div>
-      <div class="ex-body">
-        <input class="ex-name-input" value="${ex.name}" placeholder="운동 이름" oninput="exercises[${i}].name=this.value">
-        <div class="ex-vals">
-          <div class="ex-val-wrap"><div class="ex-val-label">무게(kg)</div>
-            <input class="ex-val-input" value="${ex.weight}" placeholder="-" inputmode="decimal" oninput="exercises[${i}].weight=this.value"></div>
-          <span class="ex-sep">×</span>
-          <div class="ex-val-wrap"><div class="ex-val-label">횟수</div>
-            <input class="ex-val-input" value="${ex.reps}" placeholder="-" inputmode="numeric" oninput="exercises[${i}].reps=this.value"></div>
-          <span class="ex-sep">×</span>
-          <div class="ex-val-wrap"><div class="ex-val-label">세트</div>
-            <input class="ex-val-input" value="${ex.sets}" placeholder="-" inputmode="numeric" oninput="exercises[${i}].sets=this.value"></div>
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div class="ex-num">${i+1}</div>
+        <div class="ex-body">
+          <input class="ex-name-input" value="${ex.name}" placeholder="운동 이름" oninput="exercises[${i}].name=this.value">
+          <div class="ex-vals">
+            <div class="ex-val-wrap"><div class="ex-val-label">무게(kg)</div>
+              <input class="ex-val-input" value="${ex.weight}" placeholder="-" inputmode="decimal" oninput="exercises[${i}].weight=this.value"></div>
+            <span class="ex-sep">×</span>
+            <div class="ex-val-wrap"><div class="ex-val-label">횟수</div>
+              <input class="ex-val-input" value="${ex.reps}" placeholder="-" inputmode="numeric" oninput="exercises[${i}].reps=this.value"></div>
+            <span class="ex-sep">×</span>
+            <div class="ex-val-wrap"><div class="ex-val-label">세트</div>
+              <input class="ex-val-input" value="${ex.sets}" placeholder="-" inputmode="numeric" oninput="exercises[${i}].sets=this.value"></div>
+          </div>
         </div>
+        <button class="ex-del" onclick="removeEx(${i})">×</button>
       </div>
-      <button class="ex-del" onclick="removeEx(${i})">×</button>`;
+      <div style="padding-left:36px">
+        <button class="ex-memo-toggle" onclick="toggleExMemo(${i})" id="memo-toggle-${i}">
+          ${ex.memo ? '📝 참고사항 있음' : '+ 참고사항 추가'}
+        </button>
+        <textarea class="ex-memo-input" id="memo-input-${i}"
+          placeholder="이 운동 참고사항 (예: 어깨 내회전 주의)"
+          oninput="exercises[${i}].memo=this.value"
+          style="display:${ex.memo ? 'block' : 'none'};margin-top:4px"
+        >${ex.memo || ''}</textarea>
+      </div>`;
     list.appendChild(div);
   });
 }
 
-function addExercise() { exercises.push({name:'',weight:'',reps:'',sets:''}); renderExercises(); }
-function removeEx(i) { exercises.splice(i,1); renderExercises(); }
+function toggleExMemo(i) {
+  const inp = document.getElementById(`memo-input-${i}`);
+  const btn = document.getElementById(`memo-toggle-${i}`);
+  const isVisible = inp.style.display !== 'none';
+  inp.style.display = isVisible ? 'none' : 'block';
+  btn.textContent = isVisible ? '+ 참고사항 추가' : (exercises[i].memo ? '📝 참고사항 있음' : '+ 참고사항 추가');
+  if (!isVisible) inp.focus();
+}
+
+function addExercise() { exercises.push({ name: '', weight: '', reps: '', sets: '', memo: '' }); renderExercises(); }
+function removeEx(i) { exercises.splice(i, 1); renderExercises(); }
 
 async function saveRecord() {
   if (!selectedMember) { showToast('회원을 먼저 선택해주세요'); return; }
@@ -393,9 +675,8 @@ async function saveRecord() {
   const { data: rec, error: e1 } = await sb.from('workout_records')
     .insert({ member_id: selectedMember.id, note }).select().single();
   if (e1) { load(false); showToast('저장 실패'); return; }
-  const { error: e2 } = await sb.from('exercises').insert(
-    exercises.map((ex,i) => ({ record_id: rec.id, order_num: i+1, ...ex }))
-  );
+  const { error: e2 } = await sb.from('exercises')
+    .insert(exercises.map((ex, i) => ({ record_id: rec.id, order_num: i + 1, name: ex.name, weight: ex.weight, reps: ex.reps, sets: ex.sets, memo: ex.memo || '' })));
   load(false);
   if (e2) { showToast('운동 저장 실패'); return; }
   showToast(selectedMember.name + '님 기록 저장 완료!');
@@ -404,6 +685,7 @@ async function saveRecord() {
   document.getElementById('preview-img').style.display = 'none';
   document.getElementById('photo-input').value = '';
   document.getElementById('note-input').value = '';
+  if (document.getElementById('manual-input')) document.getElementById('manual-input').value = '';
   exercises = [];
 }
 
@@ -416,121 +698,149 @@ async function loadHistory() {
   if (!data?.length) { el.innerHTML = '<div class="empty">아직 기록이 없어요.<br>수업 후 첫 기록을 남겨보세요!</div>'; return; }
   el.innerHTML = '';
   data.forEach(r => {
-    const exs = (r.exercises||[]).sort((a,b)=>a.order_num-b.order_num);
-    const tags = exs.slice(0,3).map(e=>`<span class="ex-tag">${e.name}</span>`).join('');
-    const more = exs.length>3 ? `<span class="ex-tag">+${exs.length-3}</span>` : '';
-    const date = new Date(r.recorded_at).toLocaleDateString('ko-KR',{month:'long',day:'numeric'});
+    const exs = (r.exercises || []).sort((a, b) => a.order_num - b.order_num);
+    const tags = exs.slice(0, 3).map(e => `<span class="ex-tag">${e.name}</span>`).join('');
+    const more = exs.length > 3 ? `<span class="ex-tag">+${exs.length - 3}</span>` : '';
+    const date = new Date(r.recorded_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' });
     const d = document.createElement('div');
     d.className = 'history-card';
     d.innerHTML = `
       <div class="history-header">
-        <div class="history-member">${r.members?.name||'?'}</div>
+        <div class="history-member">${r.members?.name || '?'}</div>
         <div class="history-date">${date}</div>
       </div>
       <div class="ex-tags">${tags}${more}</div>
-      ${r.note?`<div class="history-note">${r.note}</div>`:''}`;
+      ${r.note ? `<div class="history-note">${r.note}</div>` : ''}`;
     el.appendChild(d);
   });
 }
 
-async function loadMemberHome(member) {
-  currentMember = member;
-  document.getElementById('m-avatar').textContent = member.name.slice(0,2);
-  document.getElementById('m-name').textContent = member.name + '님';
+async function loadPreview(member, chip) {
+  document.querySelectorAll('#preview-chips .chip').forEach(c => c.classList.remove('selected'));
+  chip.classList.add('selected');
+  const el = document.getElementById('preview-content');
+  el.innerHTML = '<div class="empty">불러오는 중...</div>';
+
   const { count } = await sb.from('workout_records')
-    .select('*',{count:'exact',head:true}).eq('member_id', member.id);
+    .select('*', { count: 'exact', head: true }).eq('member_id', member.id);
   const total = count || 0;
   const xp = total * 100;
-  const level = Math.floor(xp/1000)+1;
+  const level = Math.floor(xp / 1000) + 1;
   const xpIn = xp % 1000;
-  document.getElementById('m-level').textContent = 'Lv.'+level;
-  document.getElementById('m-xp-fill').style.width = (xpIn/10)+'%';
-  document.getElementById('m-xp-text').textContent = `${xpIn} / 1000 XP`;
-  document.getElementById('m-total').textContent = total;
-  document.getElementById('m-streak').textContent = Math.min(total,7);
 
-  const { data } = await sb.from('workout_records')
-    .select('*,exercises(*)').eq('member_id',member.id)
-    .order('recorded_at',{ascending:false}).limit(1).maybeSingle();
+  const { data: rec } = await sb.from('workout_records')
+    .select('*, exercises(*)').eq('member_id', member.id)
+    .order('recorded_at', { ascending: false }).limit(1).maybeSingle();
 
-  const card = document.getElementById('latest-card');
-  if (data) {
-    card.style.display = 'block';
-    const nums = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
-    const exs = (data.exercises||[]).sort((a,b)=>a.order_num-b.order_num);
-    document.getElementById('latest-content').innerHTML =
-      exs.map((e,i)=>{
-        const v=[e.weight?e.weight+'kg':'',e.reps?e.reps+'회':'',e.sets?e.sets+'세트':''].filter(Boolean).join(' × ');
-        return `<div class="record-row"><span class="record-name">${nums[i]||i+1} ${e.name}</span><span class="record-val">${v}</span></div>`;
-      }).join('') + (data.note?`<div class="record-note">${data.note}</div>`:'');
-  } else { card.style.display = 'none'; }
-
-  missions = missions.map(m=>({...m,done:false}));
-  renderMissions();
-  showScreen('member-home','nav-member');
-}
-
-function renderMissions() {
-  const el = document.getElementById('mission-list');
-  el.innerHTML = '';
-  missions.forEach((m,i) => {
-    const d = document.createElement('div');
-    d.className = 'mission-row';
-    d.innerHTML = `
-      <div class="m-check ${m.done?'done':''}" onclick="toggleMission(${i})">
-        <svg viewBox="0 0 12 12" fill="none" stroke-width="2.5"><polyline points="2,6 5,9 10,3"/></svg>
+  el.innerHTML = `
+    <div class="member-header">
+      <div class="avatar">${member.name.slice(0,2)}</div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <div style="font-size:17px;font-weight:900">${member.name}님</div>
+          <div class="level-badge">Lv.${level}</div>
+        </div>
+        <div class="xp-bar-bg"><div class="xp-bar-fill" style="width:${xpIn/10}%"></div></div>
+        <div class="xp-text">${xpIn} / 1000 XP</div>
       </div>
-      <span class="m-text ${m.done?'done':''}">${m.text}</span>
-      <span class="m-xp">+${m.xp} XP</span>`;
-    el.appendChild(d);
-  });
-  document.getElementById('m-missions').textContent = missions.filter(m=>m.done).length;
+    </div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-num" style="color:#f59e0b">${Math.min(total,7)}</div><div class="stat-label">🔥 연속 출석</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#7c3aed">${total}</div><div class="stat-label">💪 총 수업</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#10b981">0</div><div class="stat-label">✅ 오늘 미션</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🎮 오늘의 미션</div>
+      <div class="missions-grid" id="preview-missions"></div>
+    </div>
+    ${rec ? `<div class="card"><div class="card-title">📋 최근 수업 기록</div><div id="preview-record"></div></div>` : ''}`;
+
+  renderMissionsInto('preview-missions', null);
+
+  if (rec) {
+    const nums = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'];
+    const exs = (rec.exercises || []).sort((a, b) => a.order_num - b.order_num);
+    document.getElementById('preview-record').innerHTML =
+      exs.map((e, i) => {
+        const v = [e.weight?e.weight+'kg':'', e.reps?e.reps+'회':'', e.sets?e.sets+'세트':''].filter(Boolean).join(' × ');
+        return `<div class="record-row" style="flex-direction:column;align-items:flex-start;gap:2px">
+          <div style="display:flex;justify-content:space-between;width:100%">
+            <span class="record-name">${nums[i]||i+1} ${e.name}</span>
+            <span class="record-val">${v}</span>
+          </div>
+          ${e.memo ? `<div class="record-ex-memo">💬 ${e.memo}</div>` : ''}
+        </div>`;
+      }).join('') + (rec.note ? `<div class="record-note">${rec.note}</div>` : '');
+  }
 }
 
-function toggleMission(i) {
+/* ===== 게임화 미션 렌더링 ===== */
+function renderMissionsInto(containerId, counterId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '';
+  missions.forEach((m, i) => {
+    const card = document.createElement('div');
+    card.className = 'mission-card' + (m.done ? ' done' : '');
+    card.id = `mission-${containerId}-${i}`;
+    card.onclick = () => toggleMission(i, containerId, counterId);
+    card.innerHTML = `
+      <div class="mission-icon-wrap" style="background:${m.color}">${m.icon}</div>
+      <div class="mission-body">
+        <div class="mission-title">${m.text}</div>
+        <div class="mission-sub">${m.sub}</div>
+      </div>
+      <div class="mission-xp">+${m.xp} XP</div>
+      <div class="mission-check-icon">
+        <svg viewBox="0 0 14 14" fill="none" stroke-width="2.5"><polyline points="2,7 6,11 12,3"/></svg>
+      </div>`;
+    el.appendChild(card);
+  });
+}
+
+function toggleMission(i, containerId, counterId) {
   missions[i].done = !missions[i].done;
-  renderMissions();
-  if (missions[i].done) showToast('+'+missions[i].xp+' XP 획득!');
+  const card = document.getElementById(`mission-${containerId}-${i}`);
+  card.classList.toggle('done', missions[i].done);
+
+  if (missions[i].done) {
+    const popup = document.createElement('div');
+    popup.className = 'xp-popup';
+    popup.textContent = '+' + missions[i].xp + ' XP!';
+    card.appendChild(popup);
+    setTimeout(() => popup.remove(), 900);
+    showToast(missions[i].icon + ' +' + missions[i].xp + ' XP 획득!');
+  }
+  if (counterId) {
+    document.getElementById(counterId).textContent = missions.filter(m => m.done).length;
+  }
 }
 
 function setMode(mode, btn) {
-  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   const nav = document.getElementById('bottom-nav');
-  if (mode === 'member') {
-    nav.innerHTML = `
-      <button class="nav-btn active" id="nav-member-select" onclick="showScreen('member-select','nav-member-select')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>회원 선택
-      </button>
-      <button class="nav-btn" id="nav-member" onclick="currentMember?showScreen('member-home','nav-member'):showToast('회원을 먼저 선택해주세요')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>홈
-      </button>`;
-    showScreen('member-select','nav-member-select');
+  if (mode === 'preview') {
+    showScreen('preview', null);
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   } else {
-    nav.innerHTML = `
-      <button class="nav-btn active" id="nav-input" onclick="showScreen('input','nav-input')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>기록 입력
-      </button>
-      <button class="nav-btn" id="nav-history" onclick="showScreen('history','nav-history');loadHistory()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>기록 보기
-      </button>`;
-    showScreen('input','nav-input');
+    showScreen('input', 'nav-input');
   }
 }
 
 function showScreen(name, navId) {
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('screen-'+name).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  const el = document.getElementById(navId); if(el) el.classList.add('active');
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (navId) { const el = document.getElementById(navId); if (el) el.classList.add('active'); }
 }
 
-function load(show) { document.getElementById('loading').classList.toggle('show',show); }
+function load(show) { document.getElementById('loading').classList.toggle('show', show); }
 
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2200);
+  setTimeout(() => t.classList.remove('show'), 2200);
 }
 
 init();
